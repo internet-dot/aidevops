@@ -95,6 +95,14 @@ t1375,Prompt injection scanner — tool-agnostic defense for aidevops and agenti
   - [x] t1375.4 Update cross-references and indexes — add prompt-injection-defender to subagent-index.toon, AGENTS.md domain index, security-audit.md audit checklist #auto-dispatch ~30m model:sonnet blocked-by:t1375.2 ref:GH#2707 pr:#2709 completed:2026-03-02
   - [x] t1375.5 Testing and verification — run existing `prompt-guard-helper.sh test`, verify new patterns detect Lasso test cases (homoglyphs, HTML comments, fake JSON roles), ShellCheck clean, verify scan-stdin pipeline works #auto-dispatch ~1h model:sonnet blocked-by:t1375.1 ref:GH#2708 pr:#2714 completed:2026-03-02
 
+- [x] t1376 docs: reposition README as AI operations platform ref:GH#2716 pr:#2716 completed:2026-03-02
+
+- [ ] t1379 feat: standalone config file for aidevops settings — `~/.config/aidevops/settings.json` as canonical config; all settings configurable via /onboarding also readable/writable in this file; file created with documented defaults on first run; /onboarding reads from and writes to this file; docs explain each setting. #feature #config #auto-dispatch ~2h model:sonnet ref:GH#2723 logged:2026-03-02
+
+- [ ] t1380 feat: auto-update opt-out and configurable update behaviour — `auto_update: false` in `~/.config/aidevops/settings.json` disables daily update launchd job; setup.sh reads this config before scheduling; docs updated. #feature #config #auto-dispatch ~1h model:sonnet blocked-by:t1379 ref:GH#2722 logged:2026-03-02
+
+- [ ] t1381 fix: setup.sh should not delete oh-my-opencode.json without opt-in — `cleanup_deprecated_paths()` in `setup-modules/migrations.sh` unconditionally deletes `~/.config/opencode/oh-my-opencode.json`; add `preserve_oh_my_opencode: true` check in settings.json; default to preserve (non-destructive); require explicit `--overwrite` flag or config opt-in to delete; docs updated. #bugfix #setup #auto-dispatch ~1h model:sonnet blocked-by:t1379 ref:GH#2724 logged:2026-03-02
+
 ## Backlog
 
 - [x] t1365 Audit aidevops README.md (108KB, 2256 lines) — largest README, will need chunked review. Check: all recent features (missions, bundles, entity memory, local models, SimpleX, Matterbridge, MCPorter, OpenAPI search, Cloudflare Code Mode MCP, localdev, skills CLI, cross-review, rate limits, budget routing, observability, intent tracing, TTSR rules, swarm DAG, IP reputation, tech stack lookup, conversational memory) are represented. Remove references to archived/removed scripts (Tier 1/2/3 archival). Verify install/setup flow matches current setup.sh. Check feature list ordering and grouping. May need multiple sub-PRs for different sections. Corresponding README audit tasks created in each tracked repo's own TODO.md. #docs #audit #auto-dispatch ~6h model:opus ref:GH#2642 logged:2026-03-01 pr:#2650 completed:2026-03-01
