@@ -384,19 +384,21 @@ update_state() {
 #######################################
 # Check skill freshness and auto-update if stale (24h gate)
 # Called from cmd_check after the main aidevops update logic.
-# Respects feature toggle: aidevops config set skill_auto_update false
+# Respects config: aidevops config set updates.skill_auto_update false
 #######################################
 check_skill_freshness() {
-	# Opt-out via feature toggle (env var or config file)
+	# Opt-out via config (env var or config file)
 	if ! is_feature_enabled skill_auto_update 2>/dev/null; then
-		log_info "Skill auto-update disabled via feature toggle"
+		log_info "Skill auto-update disabled via config"
 		return 0
 	fi
 
-	local freshness_hours="${AIDEVOPS_SKILL_FRESHNESS_HOURS:-$DEFAULT_SKILL_FRESHNESS_HOURS}"
+	# Read from JSONC config (handles env var > user config > defaults priority)
+	local freshness_hours
+	freshness_hours=$(get_feature_toggle skill_freshness_hours "$DEFAULT_SKILL_FRESHNESS_HOURS")
 	# Validate freshness_hours is a positive integer (non-numeric crashes under set -e)
 	if ! [[ "$freshness_hours" =~ ^[0-9]+$ ]] || [[ "$freshness_hours" -eq 0 ]]; then
-		log_warn "AIDEVOPS_SKILL_FRESHNESS_HOURS='${freshness_hours}' is not a positive integer — using default (${DEFAULT_SKILL_FRESHNESS_HOURS}h)"
+		log_warn "updates.skill_freshness_hours='${freshness_hours}' is not a positive integer — using default (${DEFAULT_SKILL_FRESHNESS_HOURS}h)"
 		freshness_hours="$DEFAULT_SKILL_FRESHNESS_HOURS"
 	fi
 	local freshness_seconds=$((freshness_hours * 3600))
@@ -496,13 +498,13 @@ update_skill_check_timestamp() {
 #######################################
 # Check openclaw freshness and auto-update if stale (24h gate)
 # Called from cmd_check after skill freshness check.
-# Respects feature toggle: aidevops config set openclaw_auto_update false
+# Respects config: aidevops config set updates.openclaw_auto_update false
 # Only runs if openclaw CLI is installed.
 #######################################
 check_openclaw_freshness() {
-	# Opt-out via feature toggle (env var or config file)
+	# Opt-out via config (env var or config file)
 	if ! is_feature_enabled openclaw_auto_update 2>/dev/null; then
-		log_info "OpenClaw auto-update disabled via feature toggle"
+		log_info "OpenClaw auto-update disabled via config"
 		return 0
 	fi
 
@@ -511,9 +513,11 @@ check_openclaw_freshness() {
 		return 0
 	fi
 
-	local freshness_hours="${AIDEVOPS_OPENCLAW_FRESHNESS_HOURS:-$DEFAULT_OPENCLAW_FRESHNESS_HOURS}"
+	# Read from JSONC config (handles env var > user config > defaults priority)
+	local freshness_hours
+	freshness_hours=$(get_feature_toggle openclaw_freshness_hours "$DEFAULT_OPENCLAW_FRESHNESS_HOURS")
 	if ! [[ "$freshness_hours" =~ ^[0-9]+$ ]] || [[ "$freshness_hours" -eq 0 ]]; then
-		log_warn "AIDEVOPS_OPENCLAW_FRESHNESS_HOURS='${freshness_hours}' is not a positive integer — using default (${DEFAULT_OPENCLAW_FRESHNESS_HOURS}h)"
+		log_warn "updates.openclaw_freshness_hours='${freshness_hours}' is not a positive integer — using default (${DEFAULT_OPENCLAW_FRESHNESS_HOURS}h)"
 		freshness_hours="$DEFAULT_OPENCLAW_FRESHNESS_HOURS"
 	fi
 	local freshness_seconds=$((freshness_hours * 3600))
@@ -709,19 +713,20 @@ get_user_idle_seconds() {
 # Only runs when user has been idle for AIDEVOPS_TOOL_IDLE_HOURS.
 # Delegates to tool-version-check.sh --update --quiet.
 # Called from cmd_check after other freshness checks.
-# Respects feature toggle: aidevops config set tool_auto_update false
+# Respects config: aidevops config set updates.tool_auto_update false
 #######################################
 check_tool_freshness() {
-	# Opt-out via feature toggle (env var or config file)
+	# Opt-out via config (env var or config file)
 	if ! is_feature_enabled tool_auto_update 2>/dev/null; then
-		log_info "Tool auto-update disabled via feature toggle"
+		log_info "Tool auto-update disabled via config"
 		return 0
 	fi
 
+	# Read from JSONC config (handles env var > user config > defaults priority)
 	local freshness_hours
-	freshness_hours="${AIDEVOPS_TOOL_FRESHNESS_HOURS:-$DEFAULT_TOOL_FRESHNESS_HOURS}"
+	freshness_hours=$(get_feature_toggle tool_freshness_hours "$DEFAULT_TOOL_FRESHNESS_HOURS")
 	if ! [[ "$freshness_hours" =~ ^[0-9]+$ ]] || [[ "$freshness_hours" -eq 0 ]]; then
-		log_warn "AIDEVOPS_TOOL_FRESHNESS_HOURS='${freshness_hours}' is not a positive integer — using default (${DEFAULT_TOOL_FRESHNESS_HOURS}h)"
+		log_warn "updates.tool_freshness_hours='${freshness_hours}' is not a positive integer — using default (${DEFAULT_TOOL_FRESHNESS_HOURS}h)"
 		freshness_hours="$DEFAULT_TOOL_FRESHNESS_HOURS"
 	fi
 	local freshness_seconds
@@ -757,10 +762,11 @@ check_tool_freshness() {
 	fi
 
 	# Check user idle time — only update when user is away
+	# Read from JSONC config (handles env var > user config > defaults priority)
 	local idle_hours
-	idle_hours="${AIDEVOPS_TOOL_IDLE_HOURS:-$DEFAULT_TOOL_IDLE_HOURS}"
+	idle_hours=$(get_feature_toggle tool_idle_hours "$DEFAULT_TOOL_IDLE_HOURS")
 	if ! [[ "$idle_hours" =~ ^[0-9]+$ ]] || [[ "$idle_hours" -eq 0 ]]; then
-		log_warn "AIDEVOPS_TOOL_IDLE_HOURS='${idle_hours}' is not a positive integer — using default (${DEFAULT_TOOL_IDLE_HOURS}h)"
+		log_warn "updates.tool_idle_hours='${idle_hours}' is not a positive integer — using default (${DEFAULT_TOOL_IDLE_HOURS}h)"
 		idle_hours="$DEFAULT_TOOL_IDLE_HOURS"
 	fi
 	local idle_threshold_seconds
@@ -857,9 +863,9 @@ update_tool_check_timestamp() {
 cmd_check() {
 	ensure_dirs
 
-	# Respect feature toggle (env var or config file)
+	# Respect config (env var or config file)
 	if ! is_feature_enabled auto_update 2>/dev/null; then
-		log_info "Auto-update disabled via feature toggle (env var or aidevops config)"
+		log_info "Auto-update disabled via config (updates.auto_update)"
 		return 0
 	fi
 
@@ -969,7 +975,14 @@ cmd_check() {
 cmd_enable() {
 	ensure_dirs
 
-	local interval="${AIDEVOPS_UPDATE_INTERVAL:-$DEFAULT_INTERVAL}"
+	# Read from JSONC config (handles env var > user config > defaults priority)
+	local interval
+	interval=$(get_feature_toggle update_interval "$DEFAULT_INTERVAL")
+	# Validate interval is a positive integer
+	if ! [[ "$interval" =~ ^[0-9]+$ ]] || [[ "$interval" -eq 0 ]]; then
+		log_warn "updates.update_interval_minutes='${interval}' is not a positive integer — using default (${DEFAULT_INTERVAL}m)"
+		interval="$DEFAULT_INTERVAL"
+	fi
 	local script_path="$HOME/.aidevops/agents/scripts/auto-update-helper.sh"
 
 	# Verify the script exists at the deployed location
@@ -1251,8 +1264,9 @@ cmd_status() {
 		idle_secs=$(get_user_idle_seconds)
 		idle_h=$((idle_secs / 3600))
 		idle_m=$(((idle_secs % 3600) / 60))
+		# Read from JSONC config (handles env var > user config > defaults priority)
 		local idle_threshold
-		idle_threshold="${AIDEVOPS_TOOL_IDLE_HOURS:-$DEFAULT_TOOL_IDLE_HOURS}"
+		idle_threshold=$(get_feature_toggle tool_idle_hours "$DEFAULT_TOOL_IDLE_HOURS")
 		# Validate idle_threshold is a positive integer (mirrors check_tool_freshness)
 		if ! [[ "$idle_threshold" =~ ^[0-9]+$ ]] || [[ "$idle_threshold" -eq 0 ]]; then
 			idle_threshold="$DEFAULT_TOOL_IDLE_HOURS"
@@ -1264,22 +1278,22 @@ cmd_status() {
 		fi
 	fi
 
-	# Check feature toggle overrides (env var or config file)
+	# Check config overrides (env var or config file)
 	if ! is_feature_enabled auto_update 2>/dev/null; then
 		echo ""
-		echo -e "  ${YELLOW}Note: auto_update disabled (overrides scheduler)${NC}"
+		echo -e "  ${YELLOW}Note: updates.auto_update disabled (overrides scheduler)${NC}"
 	fi
 	if ! is_feature_enabled skill_auto_update 2>/dev/null; then
 		echo ""
-		echo -e "  ${YELLOW}Note: skill_auto_update disabled (skill freshness disabled)${NC}"
+		echo -e "  ${YELLOW}Note: updates.skill_auto_update disabled${NC}"
 	fi
 	if ! is_feature_enabled openclaw_auto_update 2>/dev/null; then
 		echo ""
-		echo -e "  ${YELLOW}Note: openclaw_auto_update disabled (OpenClaw auto-update disabled)${NC}"
+		echo -e "  ${YELLOW}Note: updates.openclaw_auto_update disabled${NC}"
 	fi
 	if ! is_feature_enabled tool_auto_update 2>/dev/null; then
 		echo ""
-		echo -e "  ${YELLOW}Note: tool_auto_update disabled (tool auto-update disabled)${NC}"
+		echo -e "  ${YELLOW}Note: updates.tool_auto_update disabled${NC}"
 	fi
 
 	echo ""
