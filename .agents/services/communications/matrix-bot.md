@@ -421,11 +421,18 @@ runner-helper.sh edit code-reviewer
 
 ## Related
 
-- `scripts/entity-helper.sh` - Entity memory system (identity resolution, Layer 0/1/2)
-- `scripts/runner-helper.sh` - Runner management
-- `scripts/memory-helper.sh` - Memory system (shared memory.db)
-- `scripts/cron-dispatch.sh` - Cron-triggered dispatch (similar pattern)
-- `tools/ai-assistants/headless-dispatch.md` - Headless dispatch patterns
-- `tools/ai-assistants/opencode-server.md` - OpenCode server API
-- `tools/ai-assistants/openclaw.md` - Alternative: OpenClaw multi-channel bot
-- `services/hosting/cloudron.md` - Cloudron platform for hosting Synapse
+- `services/communications/discord.md` — Discord bot integration (community, slash commands)
+- `services/communications/msteams.md` — Microsoft Teams bot integration (enterprise, Azure Bot Framework)
+- `services/communications/urbit.md` — Urbit (sovereign personal server, P2P encrypted)
+- `services/communications/simplex.md` — SimpleX Chat (zero-knowledge, E2E encrypted)
+- `services/communications/bitchat.md` — Bitchat (Bluetooth mesh, offline P2P)
+- `services/communications/xmtp.md` — XMTP (Web3 messaging, agent SDK)
+- `services/communications/matterbridge.md` — Multi-platform chat bridge
+- `scripts/entity-helper.sh` — Entity memory system (identity resolution, Layer 0/1/2)
+- `scripts/runner-helper.sh` — Runner management
+- `scripts/memory-helper.sh` — Memory system (shared memory.db)
+- `scripts/cron-dispatch.sh` — Cron-triggered dispatch (similar pattern)
+- `tools/ai-assistants/headless-dispatch.md` — Headless dispatch patterns
+- `tools/ai-assistants/opencode-server.md` — OpenCode server API
+- `tools/ai-assistants/openclaw.md` — Alternative: OpenClaw multi-channel bot
+- `services/hosting/cloudron.md` — Cloudron platform for hosting Synapse

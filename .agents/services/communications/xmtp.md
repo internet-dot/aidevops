@@ -418,8 +418,11 @@ XMTP provides tools for AI-assisted development:
 
 ## Related
 
-- `services/communications/simplex.md` — SimpleX Chat (zero-knowledge, no identifiers)
+- `services/communications/discord.md` — Discord bot integration (community, slash commands)
+- `services/communications/msteams.md` — Microsoft Teams bot integration (enterprise, Azure Bot Framework)
 - `services/communications/matrix-bot.md` — Matrix bot integration (federated)
+- `services/communications/urbit.md` — Urbit (sovereign personal server, P2P encrypted)
+- `services/communications/simplex.md` — SimpleX Chat (zero-knowledge, no identifiers)
 - `services/communications/bitchat.md` — Bitchat (Bluetooth mesh, offline)
 - `services/communications/matterbridge.md` — Multi-platform chat bridge
 - `tools/security/opsec.md` — Operational security guidance

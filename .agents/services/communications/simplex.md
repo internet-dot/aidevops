@@ -943,11 +943,17 @@ No technical conflict — SimpleX bot commands run in chat context, aidevops com
 
 ## Related
 
-- `.agents/services/communications/matrix-bot.md` — Matrix messaging integration (federated, user IDs)
-- `.agents/tools/security/opsec.md` — Operational security guidance
-- `.agents/tools/voice/speech-to-speech.md` — Voice note transcription
-- `.agents/tools/ai-assistants/headless-dispatch.md` — Headless AI dispatch patterns
-- `.agents/services/networking/netbird.md` — Mesh VPN (complementary to SimpleX for infrastructure)
+- `services/communications/discord.md` — Discord bot integration (community, slash commands)
+- `services/communications/msteams.md` — Microsoft Teams bot integration (enterprise, Azure Bot Framework)
+- `services/communications/matrix-bot.md` — Matrix messaging integration (federated, user IDs)
+- `services/communications/urbit.md` — Urbit (sovereign personal server, P2P encrypted)
+- `services/communications/bitchat.md` — Bitchat (Bluetooth mesh, offline P2P)
+- `services/communications/xmtp.md` — XMTP (Web3 messaging, agent SDK)
+- `services/communications/matterbridge.md` — Multi-platform chat bridge
+- `tools/security/opsec.md` — Operational security guidance
+- `tools/voice/speech-to-speech.md` — Voice note transcription
+- `tools/ai-assistants/headless-dispatch.md` — Headless AI dispatch patterns
+- `services/networking/netbird.md` — Mesh VPN (complementary to SimpleX for infrastructure)
 - SimpleX Docs: https://simplex.chat/docs/
 - SimpleX Bot API: https://github.com/simplex-chat/simplex-chat/tree/stable/bots
 - SimpleX Whitepaper: https://github.com/simplex-chat/simplexmq/blob/stable/protocol/overview-tjr.md

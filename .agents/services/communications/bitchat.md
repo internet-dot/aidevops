@@ -274,8 +274,11 @@ Bitchat has no programmatic API — it is a native mobile/desktop app only. Dire
 
 ## Related
 
-- `services/communications/simplex.md` — SimpleX Chat (zero-knowledge, internet-based)
+- `services/communications/discord.md` — Discord bot integration (community, slash commands)
+- `services/communications/msteams.md` — Microsoft Teams bot integration (enterprise, Azure Bot Framework)
 - `services/communications/matrix-bot.md` — Matrix bot integration (federated, internet-based)
+- `services/communications/urbit.md` — Urbit (sovereign personal server, P2P encrypted)
+- `services/communications/simplex.md` — SimpleX Chat (zero-knowledge, internet-based)
 - `services/communications/xmtp.md` — XMTP (Web3 messaging, internet-based)
 - `services/communications/matterbridge.md` — Multi-platform chat bridge
 - `tools/security/opsec.md` — Operational security guidance

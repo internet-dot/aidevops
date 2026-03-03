@@ -698,15 +698,17 @@ No protocol-level support for voice or video calls. Some experimental integratio
 
 ## Related
 
-- `.agents/services/communications/nostr.md` — Nostr (decentralized, relay-based, censorship-resistant)
-- `.agents/services/communications/simplex.md` — SimpleX Chat (strongest metadata privacy)
-- `.agents/services/communications/matrix-bot.md` — Matrix messaging (federated, mature ecosystem)
-- `.agents/services/communications/bitchat.md` — BitChat (Bitcoin-native messaging)
-- `.agents/services/communications/xmtp.md` — XMTP (Ethereum-native messaging)
-- `.agents/services/communications/matterbridge.md` — Matterbridge (cross-platform bridging)
-- `.agents/tools/security/opsec.md` — Operational security guidance
-- `.agents/tools/credentials/gopass.md` — Secret management (for ship code storage)
-- `.agents/tools/ai-assistants/headless-dispatch.md` — Headless AI dispatch patterns
+- `services/communications/nostr.md` — Nostr (decentralized, relay-based, censorship-resistant)
+- `services/communications/simplex.md` — SimpleX Chat (strongest metadata privacy)
+- `services/communications/matrix-bot.md` — Matrix messaging (federated, mature ecosystem)
+- `services/communications/discord.md` — Discord bot integration (community, slash commands)
+- `services/communications/msteams.md` — Microsoft Teams bot integration (enterprise, Azure Bot Framework)
+- `services/communications/bitchat.md` — BitChat (Bitcoin-native messaging)
+- `services/communications/xmtp.md` — XMTP (Ethereum-native messaging)
+- `services/communications/matterbridge.md` — Matterbridge (cross-platform bridging)
+- `tools/security/opsec.md` — Operational security guidance
+- `tools/credentials/gopass.md` — Secret management (for ship code storage)
+- `tools/ai-assistants/headless-dispatch.md` — Headless AI dispatch patterns
 - Urbit Docs: https://docs.urbit.org/
 - Urbit Developers: https://developers.urbit.org/
 - Azimuth (Identity): https://azimuth.network/

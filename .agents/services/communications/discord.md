@@ -925,9 +925,12 @@ Discord's server and clients are closed-source. There is no way to audit what Di
 ## Related
 
 - `services/communications/matterbridge.md` — Multi-platform chat bridge (native Discord support)
+- `services/communications/msteams.md` — Microsoft Teams bot integration (enterprise, Azure Bot Framework)
 - `services/communications/matrix-bot.md` — Matrix bot integration (federated, E2E capable)
+- `services/communications/urbit.md` — Urbit (sovereign personal server, P2P encrypted)
 - `services/communications/simplex.md` — SimpleX Chat (maximum privacy, no identifiers)
 - `services/communications/xmtp.md` — XMTP (Web3 messaging, agent SDK)
+- `services/communications/bitchat.md` — Bitchat (Bluetooth mesh, offline P2P)
 - `tools/security/opsec.md` — Operational security guidance
 - `tools/voice/speech-to-speech.md` — Voice pipeline for audio interactions
 - `tools/ai-assistants/headless-dispatch.md` — Headless AI dispatch patterns

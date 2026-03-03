@@ -993,8 +993,12 @@ Teams client and server are proprietary. There is no way to:
 ## Related
 
 - `services/communications/matterbridge.md` — Multi-platform bridge (native Teams support)
+- `services/communications/discord.md` — Discord bot integration (community, slash commands)
 - `services/communications/matrix-bot.md` — Matrix bot integration (self-hosted, E2E optional)
+- `services/communications/urbit.md` — Urbit (sovereign personal server, P2P encrypted)
 - `services/communications/simplex.md` — SimpleX Chat (zero-knowledge, E2E encrypted)
+- `services/communications/xmtp.md` — XMTP (Web3 messaging, agent SDK)
+- `services/communications/bitchat.md` — Bitchat (Bluetooth mesh, offline P2P)
 - `tools/security/opsec.md` — Operational security guidance
 - `tools/ai-assistants/headless-dispatch.md` — Headless dispatch patterns
 - `scripts/runner-helper.sh` — Runner management
