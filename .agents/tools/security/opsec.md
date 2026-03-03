@@ -83,6 +83,14 @@ AI agents that process untrusted content (web pages, MCP tool outputs, user uplo
 | **Discord** | No | All to Discord | Yes (ToS) | US | No |
 | **Slack** | No | All to Salesforce | Yes (Enterprise AI) | US | No |
 | **Teams** | No | All to Microsoft | Yes (M365 Copilot) | US/EU | Partial |
+| **Nostr** | DMs only | Relay sees pubkeys | No (protocol) | Distributed | Yes (relay) |
+| **Urbit** | Yes (Ames) | P2P only | No | Your ship | Yes (full) |
+| **Nextcloud Talk** | Calls only | Self-controlled | No | Self-hostable | Yes |
+| **XMTP** | Yes (MLS) | Minimal | No | Distributed | Partial |
+| **Bitchat** | Yes (Noise) | None (BLE mesh) | No | Device-only | N/A (P2P) |
+| **Google Chat** | No | All to Google | Yes (Gemini) | US/EU | No |
+
+**Comprehensive comparison**: For detailed matrices covering encryption protocols, metadata exposure, identity requirements, AI training policies, push notification privacy, open source status, self-hosting options, and runner dispatch suitability across all 15 platforms, see `services/communications/privacy-comparison.md`.
 
 ### SimpleX vs Matrix Comparison
 
