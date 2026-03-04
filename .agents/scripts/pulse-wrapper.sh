@@ -1888,12 +1888,18 @@ ${type_breakdown}
 		fi
 	fi
 
-	# --- 5. CodeRabbit trigger (conditional — t1390) ---
+	# --- 5. CodeRabbit trigger (conditional — t1390, t1392) ---
 	# Only trigger @coderabbitai active review when quality degrades:
 	#   - Quality gate status changes to FAIL/ERROR
 	#   - Issue count increases by CODERABBIT_ISSUE_SPIKE+ since last sweep
 	#   - New high/critical severity findings appear
 	# Otherwise post a passive monitoring line to avoid repetitive requests.
+	#
+	# IMPORTANT (t1392): On first run (no previous state file), prev_gate is
+	# "UNKNOWN" and prev_issues/prev_high_critical are 0. Computing deltas
+	# against zero treats the entire existing issue count as a "spike",
+	# unconditionally triggering CodeRabbit. Fix: when prev_gate is UNKNOWN,
+	# this is a baseline-setting run — save state and skip delta triggers.
 	local coderabbit_section=""
 	local prev_state
 	prev_state=$(_load_sweep_state "$repo_slug")
@@ -1904,39 +1910,51 @@ ${type_breakdown}
 	[[ "$prev_issues" =~ ^[0-9]+$ ]] || prev_issues=0
 	[[ "$prev_high_critical" =~ ^[0-9]+$ ]] || prev_high_critical=0
 
-	local issue_delta=$((sweep_total_issues - prev_issues))
-	local high_critical_delta=$((sweep_high_critical - prev_high_critical))
 	local trigger_active=false
 	local trigger_reasons=""
 
-	# Condition 1: Quality gate is failing
-	if [[ "$sweep_gate_status" == "ERROR" || "$sweep_gate_status" == "WARN" ]]; then
-		trigger_active=true
-		trigger_reasons="quality gate ${sweep_gate_status}"
-	fi
-
-	# Condition 2: Issue count spiked by threshold or more
-	if [[ "$issue_delta" -ge "$CODERABBIT_ISSUE_SPIKE" ]]; then
-		trigger_active=true
-		if [[ -n "$trigger_reasons" ]]; then
-			trigger_reasons="${trigger_reasons}, issue spike +${issue_delta}"
-		else
-			trigger_reasons="issue spike +${issue_delta}"
-		fi
-	fi
-
-	# Condition 3: New high/critical severity findings
-	if [[ "$high_critical_delta" -gt 0 ]]; then
-		trigger_active=true
-		if [[ -n "$trigger_reasons" ]]; then
-			trigger_reasons="${trigger_reasons}, +${high_critical_delta} high/critical"
-		else
-			trigger_reasons="+${high_critical_delta} high/critical findings"
-		fi
-	fi
-
-	if [[ "$trigger_active" == true ]]; then
+	if [[ "$prev_gate" == "UNKNOWN" ]]; then
+		# First run — no previous state to compare against. Treat as baseline:
+		# save current metrics and post a passive monitoring line. Without this
+		# guard, delta computation against zero fires false-positive triggers
+		# (e.g., 113 existing issues - 0 = +113 "spike"). (t1392)
 		coderabbit_section="### CodeRabbit
+
+_Baseline run: recording ${sweep_total_issues} issues, gate ${sweep_gate_status}, ${sweep_high_critical} high/critical. Deltas will be computed from next sweep._
+"
+		echo "[pulse-wrapper] CodeRabbit: baseline run for ${repo_slug} — saving state, skipping triggers" >>"$LOGFILE"
+	else
+		local issue_delta=$((sweep_total_issues - prev_issues))
+		local high_critical_delta=$((sweep_high_critical - prev_high_critical))
+
+		# Condition 1: Quality gate is failing
+		if [[ "$sweep_gate_status" == "ERROR" || "$sweep_gate_status" == "WARN" ]]; then
+			trigger_active=true
+			trigger_reasons="quality gate ${sweep_gate_status}"
+		fi
+
+		# Condition 2: Issue count spiked by threshold or more
+		if [[ "$issue_delta" -ge "$CODERABBIT_ISSUE_SPIKE" ]]; then
+			trigger_active=true
+			if [[ -n "$trigger_reasons" ]]; then
+				trigger_reasons="${trigger_reasons}, issue spike +${issue_delta}"
+			else
+				trigger_reasons="issue spike +${issue_delta}"
+			fi
+		fi
+
+		# Condition 3: New high/critical severity findings
+		if [[ "$high_critical_delta" -gt 0 ]]; then
+			trigger_active=true
+			if [[ -n "$trigger_reasons" ]]; then
+				trigger_reasons="${trigger_reasons}, +${high_critical_delta} high/critical"
+			else
+				trigger_reasons="+${high_critical_delta} high/critical findings"
+			fi
+		fi
+
+		if [[ "$trigger_active" == true ]]; then
+			coderabbit_section="### CodeRabbit
 
 **Trigger**: ${trigger_reasons}
 
@@ -1946,12 +1964,13 @@ ${type_breakdown}
 - Code duplication and maintainability
 - Documentation accuracy
 "
-		echo "[pulse-wrapper] CodeRabbit: active review triggered for ${repo_slug} (${trigger_reasons})" >>"$LOGFILE"
-	else
-		coderabbit_section="### CodeRabbit
+			echo "[pulse-wrapper] CodeRabbit: active review triggered for ${repo_slug} (${trigger_reasons})" >>"$LOGFILE"
+		else
+			coderabbit_section="### CodeRabbit
 
 _Monitoring: ${sweep_total_issues} issues (delta: ${issue_delta}), gate ${sweep_gate_status}, ${sweep_high_critical} high/critical — no active review needed._
 "
+		fi
 	fi
 	tool_count=$((tool_count + 1))
 
