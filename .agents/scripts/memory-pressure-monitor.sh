@@ -44,6 +44,42 @@ readonly COOLDOWN_FILE_CRIT="${STATE_DIR}/memory-pressure-crit.cooldown"
 readonly LAUNCHD_LABEL="sh.aidevops.memory-pressure-monitor"
 readonly PLIST_PATH="${HOME}/Library/LaunchAgents/${LAUNCHD_LABEL}.plist"
 
+# --- Validation ---------------------------------------------------------------
+
+validate_config() {
+	local valid=true
+
+	# Validate WARN_THRESHOLD is an integer 0-100
+	if [[ ! "${WARN_THRESHOLD}" =~ ^[0-9]+$ ]] || ((WARN_THRESHOLD < 0 || WARN_THRESHOLD > 100)); then
+		echo "[${SCRIPT_NAME}] ERROR: MEMORY_WARN_THRESHOLD must be an integer 0-100 (got: '${WARN_THRESHOLD}')" >&2
+		valid=false
+	fi
+
+	# Validate CRIT_THRESHOLD is an integer 0-100
+	if [[ ! "${CRIT_THRESHOLD}" =~ ^[0-9]+$ ]] || ((CRIT_THRESHOLD < 0 || CRIT_THRESHOLD > 100)); then
+		echo "[${SCRIPT_NAME}] ERROR: MEMORY_CRIT_THRESHOLD must be an integer 0-100 (got: '${CRIT_THRESHOLD}')" >&2
+		valid=false
+	fi
+
+	# Validate WARN_THRESHOLD > CRIT_THRESHOLD (warn fires first as memory drops)
+	if [[ "${valid}" == "true" ]] && ((WARN_THRESHOLD <= CRIT_THRESHOLD)); then
+		echo "[${SCRIPT_NAME}] ERROR: MEMORY_WARN_THRESHOLD (${WARN_THRESHOLD}) must be greater than MEMORY_CRIT_THRESHOLD (${CRIT_THRESHOLD})" >&2
+		valid=false
+	fi
+
+	# Validate COOLDOWN_SECS is a non-negative integer
+	if [[ ! "${COOLDOWN_SECS}" =~ ^[0-9]+$ ]]; then
+		echo "[${SCRIPT_NAME}] ERROR: MEMORY_COOLDOWN_SECS must be a non-negative integer (got: '${COOLDOWN_SECS}')" >&2
+		valid=false
+	fi
+
+	if [[ "${valid}" != "true" ]]; then
+		return 1
+	fi
+
+	return 0
+}
+
 # --- Helpers ------------------------------------------------------------------
 
 log_msg() {
@@ -96,6 +132,10 @@ check_cooldown() {
 	if [[ -f "${cooldown_file}" ]]; then
 		local last_notify
 		last_notify="$(cat "${cooldown_file}" 2>/dev/null || echo 0)"
+		# Validate last_notify is a non-negative integer; fallback to 0 if corrupted
+		if [[ ! "${last_notify}" =~ ^[0-9]+$ ]]; then
+			last_notify=0
+		fi
 		local now
 		now="$(date +%s)"
 		local elapsed=$((now - last_notify))
@@ -116,7 +156,18 @@ set_cooldown() {
 get_memory_level() {
 	# kern.memorystatus_level: 0-100, percentage of memory considered "free"
 	# by the kernel (includes purgeable, inactive, free pages)
-	sysctl -n kern.memorystatus_level 2>/dev/null || echo "0"
+	local level
+	if ! level="$(sysctl -n kern.memorystatus_level 2>/dev/null)"; then
+		log_msg "WARN" "Unable to read kern.memorystatus_level"
+		echo ""
+		return 1
+	fi
+	if [[ ! "${level}" =~ ^[0-9]+$ ]] || ((level < 0 || level > 100)); then
+		log_msg "WARN" "Invalid kern.memorystatus_level value: ${level}"
+		echo ""
+		return 1
+	fi
+	echo "${level}"
 }
 
 get_total_memory_gb() {
@@ -163,7 +214,7 @@ get_top_memory_consumers() {
 
 collect_state() {
 	local level
-	level="$(get_memory_level)"
+	level="$(get_memory_level)" || true
 	local total_gb
 	total_gb="$(get_total_memory_gb)"
 	local swap_info
@@ -211,10 +262,17 @@ do_check() {
 
 	local state
 	state="$(collect_state)"
-	local severity
-	severity="$(evaluate_state "${state}")"
 	local level
 	level="$(echo "${state}" | cut -d'|' -f1)"
+
+	# Skip this check cycle if memory level is unavailable
+	if [[ -z "${level}" ]]; then
+		log_msg "WARN" "Memory level unavailable; skipping this check cycle"
+		return 0
+	fi
+
+	local severity
+	severity="$(evaluate_state "${state}")"
 
 	case "${severity}" in
 	critical)
@@ -290,6 +348,7 @@ cmd_daemon() {
 	echo "[${SCRIPT_NAME}] Starting daemon mode (interval: ${DAEMON_INTERVAL}s)"
 	echo "[${SCRIPT_NAME}] Thresholds: warn=${WARN_THRESHOLD}%, crit=${CRIT_THRESHOLD}%"
 	echo "[${SCRIPT_NAME}] Press Ctrl+C to stop"
+	trap 'echo "[${SCRIPT_NAME}] Shutting down"; exit 0' SIGTERM SIGINT
 
 	while true; do
 		do_check
@@ -306,6 +365,9 @@ cmd_install() {
 	if [[ -x "${installed_path}" ]]; then
 		script_path="${installed_path}"
 	fi
+
+	# Ensure LaunchAgents directory exists
+	mkdir -p "$(dirname "${PLIST_PATH}")"
 
 	cat >"${PLIST_PATH}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -371,6 +433,11 @@ cmd_uninstall() {
 
 main() {
 	local cmd="${1:-check}"
+
+	# Validate configuration before any operation (except --help)
+	if [[ "${cmd}" != "--help" && "${cmd}" != "-h" ]]; then
+		validate_config
+	fi
 
 	case "${cmd}" in
 	--status | -s)
