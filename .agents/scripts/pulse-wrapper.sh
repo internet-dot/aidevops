@@ -119,7 +119,7 @@ check_dedup() {
 	fi
 
 	# Check if the process is still running
-	if ! kill -0 "$old_pid" 2>/dev/null; then
+	if ! ps -p "$old_pid" >/dev/null; then
 		# Process is dead, clean up stale PID file
 		rm -f "$PIDFILE"
 		return 0
@@ -135,7 +135,7 @@ check_dedup() {
 		_kill_tree "$old_pid"
 		sleep 2
 		# Force kill if still alive
-		if kill -0 "$old_pid" 2>/dev/null; then
+		if ps -p "$old_pid" >/dev/null; then
 			_force_kill_tree "$old_pid"
 		fi
 		rm -f "$PIDFILE"
@@ -888,7 +888,7 @@ ${state_content}
 	# Watchdog loop: check every 60s if the process is still alive and within
 	# the stale threshold. This replaces the bare `wait` that blocked the
 	# wrapper indefinitely when opencode hung.
-	while kill -0 "$opencode_pid" 2>/dev/null; do
+	while ps -p "$opencode_pid" >/dev/null; do
 		local now
 		now=$(date +%s)
 		local elapsed=$((now - start_epoch))
@@ -897,13 +897,13 @@ ${state_content}
 			_kill_tree "$opencode_pid"
 			sleep 2
 			# Force kill if still alive
-			if kill -0 "$opencode_pid" 2>/dev/null; then
+			if ps -p "$opencode_pid" >/dev/null; then
 				_force_kill_tree "$opencode_pid"
 			fi
 			break
 		fi
 		# Sleep 60s then re-check. Portable across bash 3.2+ (macOS default).
-		# The process may exit during sleep — kill -0 at top of loop catches that.
+		# The process may exit during sleep — ps -p at top of loop catches that.
 		sleep 60
 	done
 
@@ -1493,7 +1493,7 @@ run_daily_quality_sweep() {
 	# Timestamp guard — run at most once per QUALITY_SWEEP_INTERVAL
 	if [[ -f "$QUALITY_SWEEP_LAST_RUN" ]]; then
 		local last_run
-		last_run=$(cat "$QUALITY_SWEEP_LAST_RUN" 2>/dev/null || echo "0")
+		last_run=$(cat "$QUALITY_SWEEP_LAST_RUN" || echo "0")
 		# Strip whitespace/newlines and validate integer (t1397)
 		last_run="${last_run//[^0-9]/}"
 		last_run="${last_run:-0}"
