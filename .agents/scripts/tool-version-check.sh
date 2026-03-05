@@ -112,13 +112,24 @@ get_installed_version() {
 
 	if command -v "$cmd" &>/dev/null; then
 		local version
-		# shellcheck disable=SC2086
-		version=$("$cmd" $ver_flag 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
-		if [[ -z "$version" ]]; then
-			# Try alternative patterns
-			# shellcheck disable=SC2086
-			version=$("$cmd" $ver_flag 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+' | head -1 || echo "unknown")
+		# Timeout version checks — some tools (MCP servers) start a blocking
+		# server process when given --version instead of printing a version.
+		# Without a timeout, the subshell hangs forever.
+		# NOTE: Do NOT pipe timeout_sec to head/grep — on macOS the perl alarm
+		# fallback doesn't close the pipe write end on SIGALRM, causing head to
+		# block forever. Use a temp file instead.
+		local _ver_log
+		if ! _ver_log=$(mktemp "${TMPDIR:-/tmp}/tool-ver.XXXXXX"); then
+			echo "unknown"
+			return 0
 		fi
+		# shellcheck disable=SC2086
+		timeout_sec 5 "$cmd" $ver_flag >"$_ver_log" 2>/dev/null || true
+		version=$(head -1 "$_ver_log" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
+		if [[ -z "$version" ]]; then
+			version=$(head -1 "$_ver_log" | grep -oE '[0-9]+\.[0-9]+' | head -1 || echo "unknown")
+		fi
+		rm -f "$_ver_log"
 		echo "$version"
 	else
 		echo "not installed"
@@ -136,13 +147,14 @@ timeout_sec() {
 		# Linux has native timeout
 		timeout "$timeout" "$@"
 	else
-		# macOS: use perl or gtimeout if available, otherwise run without timeout
-		if command -v perl &>/dev/null; then
-			perl -e 'alarm shift; exec @ARGV' "$timeout" "$@"
-		elif command -v gtimeout &>/dev/null; then
+		# macOS: prefer gtimeout (robust exit codes, pipe handling) over perl alarm
+		if command -v gtimeout &>/dev/null; then
 			gtimeout "$timeout" "$@"
+		elif command -v perl &>/dev/null; then
+			perl -e 'alarm shift; exec @ARGV' "$timeout" "$@"
 		else
 			# No timeout available - run directly (will hang if command hangs)
+			echo "[WARN] No timeout command available - running without timeout" >&2
 			"$@"
 		fi
 	fi
@@ -371,11 +383,23 @@ main() {
 				# Run update command directly (not via eval for security)
 				# Commands are hardcoded in tool definitions, not user input
 				# Timeout prevents hangs on slow registries/network issues
-				if timeout 120 bash -c "$update_cmd" 2>&1 | tail -2; then
+				# Use timeout_sec for macOS compatibility (no native timeout)
+				# NOTE: Do NOT pipe timeout_sec output to tail/head — on macOS the
+				# perl alarm fallback doesn't close the pipe's write end on SIGALRM,
+				# causing tail to block forever. Use a temp file instead.
+				local _update_log
+				if ! _update_log=$(mktemp "${TMPDIR:-/tmp}/tool-update.XXXXXX"); then
+					echo -e "  ${RED}✗ Failed to create temp log${NC}"
+					continue
+				fi
+				if timeout_sec 120 bash -c "$update_cmd" >"$_update_log" 2>&1; then
+					tail -2 "$_update_log"
 					echo -e "  ${GREEN}✓ Updated${NC}"
 				else
+					tail -2 "$_update_log"
 					echo -e "  ${RED}✗ Failed${NC}"
 				fi
+				rm -f "$_update_log"
 				echo ""
 			done
 			echo -e "${GREEN}Updates complete. Re-run to verify.${NC}"
