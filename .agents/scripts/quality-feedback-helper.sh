@@ -791,7 +791,6 @@ _scan_single_pr() {
 			reviewer: $reviewer,
 			reviewer_login: $login,
 			severity: $severity,
-			state: .state,
 			file: null,
 			line: null,
 			body: (.body | split("\n") | map(select(length > 0)) | first // .body),
@@ -823,9 +822,6 @@ _scan_single_pr() {
 		done
 		review_findings="$actionable_reviews"
 	fi
-
-	# Remove the temporary 'state' field used for filtering
-	review_findings=$(echo "$review_findings" | jq '[.[] | del(.state)]')
 
 	# Merge and deduplicate
 	findings=$(echo "$inline_findings" "$review_findings" | jq -s '.[0] + .[1]')
