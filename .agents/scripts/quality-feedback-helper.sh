@@ -536,12 +536,154 @@ cmd_scan_merged() {
 }
 
 #######################################
+# Check if a review body is purely approving with no actionable findings
+#
+# Uses pattern matching to detect reviews that are entirely positive
+# (e.g., "no further feedback", "LGTM", "looks good"). Returns true
+# (0) if the review is approving-only, false (1) if it contains
+# actionable feedback.
+#
+# Strategy: conservative — only filter reviews that are clearly
+# approving. If uncertain, treat as actionable (return 1).
+# False negatives (missing a real finding) are worse than false
+# positives (creating an unnecessary issue).
+#
+# Arguments:
+#   $1 - review body text
+# Returns: 0 if approving-only (should be filtered), 1 if actionable
+#######################################
+_is_approving_review() {
+	local body="$1"
+
+	# Empty or very short bodies are not actionable
+	if [[ ${#body} -lt 20 ]]; then
+		return 0
+	fi
+
+	# Strip markdown formatting, HTML tags, and whitespace for analysis
+	local stripped
+	stripped=$(echo "$body" | sed -E '
+		s/<[^>]+>//g;
+		s/\[([^]]*)\]\([^)]*\)//g;
+		s/^#+[[:space:]]*//;
+		s/\*+//g;
+		s/`+//g;
+		s/^[[:space:]]*---[[:space:]]*$//;
+		s/^[[:space:]]*\*\*[[:space:]]*$//;
+		/^[[:space:]]*$/d
+	' | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g')
+
+	# Step 1: Check for DIRECTIVE language — the reviewer telling the
+	# author to DO something. These are unambiguously actionable regardless
+	# of any approving language also present.
+	# Key distinction: "fixes a critical issue" (describing the PR) vs
+	# "there is a bug" (reporting a finding). Directive patterns use
+	# imperative/modal forms directed at the author.
+	local directive_patterns=(
+		# Reviewer directing author to change something
+		"you should"
+		"you need to"
+		"you must"
+		"please (fix|change|update|add|remove|replace|consider|review)"
+		"I (suggest|recommend|would recommend)"
+		"consider (adding|using|changing|replacing|removing|implementing)"
+		# Reviewer reporting a finding (present tense, about the code)
+		"there is a (bug|problem|issue|vulnerability|risk|flaw)"
+		"there are (bugs|problems|issues|vulnerabilities|risks|flaws)"
+		"this (is|will|could|might|may) (cause|break|fail|crash|leak)"
+		"this (should|needs to|must) be"
+		"(is|are) not (handled|checked|validated|sanitized|escaped)"
+		# Code review labels/markers
+		"suggestion:"
+		"nitpick:"
+		"nit:"
+		"warning:"
+		"TODO[: ]"
+		"FIXME"
+		"HACK[: ]"
+		# Specific technical findings
+		"(SQL |command |code |prompt )?injection"
+		"XSS"
+		"CSRF"
+		"race condition"
+		"memory leak"
+		"null pointer"
+		"off.by.one"
+		"unused (variable|import|parameter|function)"
+		"dead code"
+		"unreachable code"
+		"(is|are) deprecated"
+		# Conditional/hedged findings
+		"however[,.]"
+		"but (there|this|the|I|it|you)"
+		"although"
+		"one (concern|issue|problem|suggestion|thing)"
+	)
+
+	for pattern in "${directive_patterns[@]}"; do
+		if echo "$stripped" | grep -qiE "$pattern"; then
+			return 1
+		fi
+	done
+
+	# Step 2: Check for approving patterns. If the review has approving
+	# language and passed the directive check above, it's safe to filter.
+	local approving_patterns=(
+		# Explicit "no feedback" signals
+		"no (further |additional )?feedback"
+		"no (further |additional )?comments"
+		"no (further |additional )?suggestions"
+		"no (further |additional )?issues"
+		"no (further |additional )?concerns"
+		"no (major |significant |critical )?(issues|concerns|problems)"
+		"nothing to (add|flag|report|note)"
+		"have no further"
+		"no actionable (items|findings|issues)"
+		"all (changes|modifications) look good"
+		# Short approvals
+		"looks good"
+		"LGTM"
+		"ship it"
+		"ready to merge"
+		"good to merge"
+		"approve"
+		# Positive assessment of the PR (describing what it does well)
+		"well.structured"
+		"well.written"
+		"well.implemented"
+		"well.designed"
+		"well.documented"
+		"well.reasoned"
+		"clean (code|implementation|change)"
+		"solid (implementation|change|approach)"
+		"good (job|work|approach|implementation)"
+		"nicely (done|implemented|structured)"
+		"changes are (consistent|correct|appropriate|targeted)"
+		"effectively (resolves?|fixes?|addresses?|handles?)"
+		"correctly (identifies?|removes?|fixes?|addresses?|handles?)"
+		"I have reviewed .* and have no"
+		"the (changes|modifications|updates) (are|look) (good|correct|fine|appropriate)"
+	)
+
+	for pattern in "${approving_patterns[@]}"; do
+		if echo "$stripped" | grep -qiE "$pattern"; then
+			return 0
+		fi
+	done
+
+	# No clear signal either way — treat as potentially actionable
+	# (conservative: don't filter)
+	return 1
+}
+
+#######################################
 # Scan a single merged PR for review feedback
 #
 # Fetches both inline review comments and review bodies from all
 # reviewers (bots and humans). Extracts severity from known patterns
 # (Gemini SVG markers, CodeRabbit labels). Checks if affected files
-# still exist on HEAD.
+# still exist on HEAD. Filters out purely approving reviews that
+# contain no actionable findings (t1406).
 #
 # Arguments:
 #   $1 - repo slug
@@ -643,15 +785,13 @@ _scan_single_pr() {
 
 		select($sev_num >= $min_num) |
 
-		# Skip approval-only reviews with no substantive body
-		select(.state != "APPROVED" or (.body | length) > 100) |
-
 		{
 			pr: ($pr | tonumber),
 			type: "review_body",
 			reviewer: $reviewer,
 			reviewer_login: $login,
 			severity: $severity,
+			state: .state,
 			file: null,
 			line: null,
 			body: (.body | split("\n") | map(select(length > 0)) | first // .body),
@@ -660,6 +800,32 @@ _scan_single_pr() {
 			created_at: .submitted_at
 		}]
 	' 2>/dev/null) || review_findings="[]"
+
+	# Filter out approving reviews with no actionable findings (t1406)
+	# jq can't call bash functions, so we iterate and filter in bash
+	local actionable_reviews="[]"
+	local review_count
+	review_count=$(echo "$review_findings" | jq 'length' 2>/dev/null || echo "0")
+
+	if [[ "$review_count" -gt 0 ]]; then
+		local i=0
+		while [[ "$i" -lt "$review_count" ]]; do
+			local review_body
+			review_body=$(echo "$review_findings" | jq -r ".[$i].body_full // \"\"")
+
+			if _is_approving_review "$review_body"; then
+				echo "    Filtered approving review (no actionable findings) in PR #${pr_num}" >&2
+			else
+				# Keep this finding — it has actionable content
+				actionable_reviews=$(echo "$actionable_reviews" "$(echo "$review_findings" | jq ".[$i]")" | jq -s '.[0] + [.[1]]')
+			fi
+			i=$((i + 1))
+		done
+		review_findings="$actionable_reviews"
+	fi
+
+	# Remove the temporary 'state' field used for filtering
+	review_findings=$(echo "$review_findings" | jq '[.[] | del(.state)]')
 
 	# Merge and deduplicate
 	findings=$(echo "$inline_findings" "$review_findings" | jq -s '.[0] + .[1]')
