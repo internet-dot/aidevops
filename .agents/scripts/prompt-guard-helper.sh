@@ -1867,7 +1867,10 @@ cmd_scan_content() {
 	if command -v jq &>/dev/null; then
 		# Build findings array in a single jq pipeline (avoids per-finding process spawns)
 		local findings_json
-		findings_json=$(printf '%s' "$results" | jq -Rnc '[inputs | select(length > 0) | split("|") | {severity: .[0], category: .[1], description: .[2], matched: (.[3] // "")}]')
+		findings_json=$(printf '%s' "$results" | jq -Rnc '
+			[inputs
+			 | select(length > 0)
+			 | capture("^(?<severity>[^|]*)\\|(?<category>[^|]*)\\|(?<description>[^|]*)\\|(?<matched>.*)$")]')
 
 		jq -nc \
 			--arg result "findings" \
