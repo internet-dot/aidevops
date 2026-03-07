@@ -1790,26 +1790,26 @@ cmd_scan_content() {
 			;;
 		*)
 			_pg_log_error "Unknown argument: $1"
-			return 1
+			return 2
 			;;
 		esac
 	done
 
 	if [[ -z "$content_type" ]]; then
 		_pg_log_error "Missing --type argument for scan-content"
-		return 1
+		return 2
 	fi
 
 	# Read content from stdin
 	if [[ -t 0 ]]; then
 		_pg_log_error "scan-content requires piped input"
-		return 1
+		return 2
 	fi
 
 	local content
 	if ! content=$(cat); then
 		_pg_log_error "Failed to read from stdin"
-		return 1
+		return 2
 	fi
 
 	if [[ -z "$content" ]]; then
