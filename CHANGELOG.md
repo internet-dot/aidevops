@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.153.0] - 2026-03-07
+
+### Added
+
+- pulse CI failure pattern detection — identify systemic workflow bugs (#2979)
+
+### Fixed
+
+- replace ls -lh with stat-based human_filesize helper (SC2012) (#3059)
+- resolve SC2034 unused variable warnings in test and agent scripts (#3060)
+- add per-file SC2329 shellcheck disable directives with justification (#3061)
+- replace sed with parameter expansion in email-signature-parser-helper.sh (#3055)
+- remove unreachable return guard in generate-claude-commands.sh (SC2317) (#3054)
+- export platform/repo constants to prevent recurring SC2034 (#3045) (#3046)
+- remove incorrect format-lineage helper reference from headless-dispatch docs (#3043)
+- pass title as positional arg to classify in new-task.md (#3041)
+- remove 2>/dev/null from task decomposition bash examples (#3040)
+- address high-severity quality-debt in batch-strategy-helper.sh (#3033)
+- group consecutive redirects with { } >> file (SC2129) in setup-modules (#3015)
+- remove unused PLATFORM_LINUX and annotate cross-file SC2034 variables (#3012)
+- replace SC2015 A&&B||C antipatterns with if-then-else in mcp-setup.sh (#3011)
+- review-bot-gate falls back to SUCCESS status checks when bots are rate-limited (#3006)
+
 ## [2.152.0] - 2026-03-06
 
 ### Added
