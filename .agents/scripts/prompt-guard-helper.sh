@@ -73,6 +73,18 @@ PROMPT_GUARD_YAML_PATTERNS="${PROMPT_GUARD_YAML_PATTERNS:-}"
 _PG_YAML_PATTERNS_CACHE=""
 _PG_YAML_PATTERNS_LOADED="false"
 
+# Escape a string for safe interpolation into JSON (when jq is unavailable)
+_pg_json_escape() {
+	local val="$1"
+	val=${val//\\/\\\\}
+	val=${val//\"/\\\"}
+	val=${val//$'\n'/\\n}
+	val=${val//$'\r'/\\r}
+	val=${val//$'\t'/\\t}
+	printf '%s' "$val"
+	return 0
+}
+
 # ============================================================
 # SEVERITY LEVELS (numeric for comparison)
 # ============================================================
@@ -662,35 +674,31 @@ _pg_scan_message() {
 	local message="$1"
 	_pg_scan_found=0
 
-	# Step 1: Keyword pre-filter (t1412.4)
-	# Fast check — if no injection keywords are present, skip the expensive
-	# regex scan entirely. ~100x faster for clean content (the common case).
-	if ! _pg_keyword_prefilter "$message"; then
-		# No keywords found — content is almost certainly clean.
-		# Still check for zero-width/invisible chars (no keyword needed).
-		local has_invisible="false"
-		if printf '%s' "$message" | grep -qP '[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]' 2>/dev/null; then
-			has_invisible="true"
-		fi
-		if [[ "$has_invisible" == "false" ]]; then
-			return 0
-		fi
-		# Fall through to full scan only for invisible character detection
-	fi
-
-	# Step 2: NFKC Unicode normalization (t1412.4)
-	# Normalize the message to close fullwidth/mathematical/modifier bypasses.
-	# Scan both the original and normalized forms to catch both raw and
-	# normalized variants.
+	# Step 1: NFKC Unicode normalization (t1412.4)
+	# Normalize BEFORE the keyword pre-filter so fullwidth/mathematical
+	# variants of keywords are caught by the fast path.
 	local normalized_message
 	normalized_message=$(_pg_normalize_nfkc "$message")
 
 	# Use the normalized message for pattern matching if it differs
 	local scan_message="$message"
 	if [[ "$normalized_message" != "$message" ]]; then
-		# Scan normalized form (catches Unicode bypasses)
 		scan_message="$normalized_message"
 		_pg_log_info "Unicode normalization applied (content contained non-ASCII variants)"
+	fi
+
+	# Step 2: Keyword pre-filter (t1412.4)
+	# Fast check — if no injection keywords are present, skip the expensive
+	# regex scan entirely. ~100x faster for clean content (the common case).
+	# Run against both original and normalized forms.
+	if ! _pg_keyword_prefilter "$message" && ! _pg_keyword_prefilter "$normalized_message"; then
+		# No keywords found — content is almost certainly clean.
+		# Still check for zero-width/invisible chars (no keyword needed).
+		# Use _pg_match for portable detection (handles grep -P absence).
+		if ! _pg_match '[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\x{200B}\x{200C}\x{200D}\x{FEFF}]' "$message"; then
+			return 0
+		fi
+		# Fall through to full scan only for invisible character detection
 	fi
 
 	# Try YAML patterns first (comprehensive), fall back to inline (core set)
@@ -1812,7 +1820,11 @@ cmd_scan_content() {
 	fi
 
 	if [[ -z "$content" ]]; then
-		echo '{"result":"clean","finding_count":0,"max_severity":"NONE","content_type":"'"$content_type"'","source":"'"${source_id:-unknown}"'"}'
+		local safe_type safe_src
+		safe_type=$(_pg_json_escape "$content_type")
+		safe_src=$(_pg_json_escape "${source_id:-unknown}")
+		printf '{"result":"clean","finding_count":0,"max_severity":"NONE","content_type":"%s","source":"%s"}\n' \
+			"$safe_type" "$safe_src"
 		return 0
 	fi
 
@@ -1835,8 +1847,11 @@ cmd_scan_content() {
 				--argjson bytes "$byte_count" \
 				'{result: $result, finding_count: 0, max_severity: "NONE", content_type: $type, source: $source, byte_count: $bytes}'
 		else
+			local safe_type safe_src
+			safe_type=$(_pg_json_escape "$content_type")
+			safe_src=$(_pg_json_escape "${source_id:-unknown}")
 			printf '{"result":"clean","finding_count":0,"max_severity":"NONE","content_type":"%s","source":"%s","byte_count":%d}\n' \
-				"$content_type" "${source_id:-unknown}" "$byte_count"
+				"$safe_type" "$safe_src" "$byte_count"
 		fi
 		return 0
 	fi
@@ -1879,8 +1894,12 @@ cmd_scan_content() {
 			--argjson findings "$findings_json" \
 			'{result: $result, finding_count: $count, max_severity: $severity, content_type: $type, source: $source, byte_count: $bytes, findings: $findings}'
 	else
+		local safe_type safe_src safe_sev
+		safe_type=$(_pg_json_escape "$content_type")
+		safe_src=$(_pg_json_escape "${source_id:-unknown}")
+		safe_sev=$(_pg_json_escape "$max_severity")
 		printf '{"result":"findings","finding_count":%d,"max_severity":"%s","content_type":"%s","source":"%s","byte_count":%d}\n' \
-			"$finding_count" "$max_severity" "$content_type" "${source_id:-unknown}" "$byte_count"
+			"$finding_count" "$safe_sev" "$safe_type" "$safe_src" "$byte_count"
 	fi
 
 	return 1

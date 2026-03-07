@@ -50,7 +50,7 @@ set -euo pipefail
 # ============================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || exit 1
-source "${SCRIPT_DIR}/shared-constants.sh" 2>/dev/null || true
+source "${SCRIPT_DIR}/shared-constants.sh" || true
 
 # Fallback colours if shared-constants.sh not loaded
 [[ -z "${RED+x}" ]] && RED='\033[0;31m'
@@ -60,6 +60,19 @@ source "${SCRIPT_DIR}/shared-constants.sh" 2>/dev/null || true
 [[ -z "${PURPLE+x}" ]] && PURPLE='\033[0;35m'
 [[ -z "${CYAN+x}" ]] && CYAN='\033[0;36m'
 [[ -z "${NC+x}" ]] && NC='\033[0m'
+
+# Escape a string for safe interpolation into JSON (when jq is unavailable)
+# Handles: backslash, double-quote, control chars (newline, tab, carriage return)
+_rs_json_escape() {
+	local val="$1"
+	val=${val//\\/\\\\}
+	val=${val//\"/\\\"}
+	val=${val//$'\n'/\\n}
+	val=${val//$'\r'/\\r}
+	val=${val//$'\t'/\\t}
+	printf '%s' "$val"
+	return 0
+}
 
 # Feature toggle — allows disabling scanning without removing integration
 RUNTIME_SCAN_ENABLED="${RUNTIME_SCAN_ENABLED:-true}"
@@ -179,8 +192,17 @@ _rs_wrap_content() {
 	local risk_level
 	risk_level=$(_rs_risk_level "$content_type")
 
+	# Escape source to prevent boundary tag spoofing via quotes/newlines
+	local escaped_source="$source"
+	escaped_source=${escaped_source//\\/\\\\}
+	escaped_source=${escaped_source//\"/\\\"}
+	escaped_source=${escaped_source//$'\r'/ }
+	escaped_source=${escaped_source//$'\n'/ }
+	# Strip closing bracket to prevent tag escape
+	escaped_source=${escaped_source//]/}
+
 	printf '[UNTRUSTED-DATA-%s type="%s" source="%s" risk="%s"]\n' \
-		"$boundary_id" "$content_type" "$source" "$risk_level"
+		"$boundary_id" "$content_type" "$escaped_source" "$risk_level"
 	printf '%s\n' "$content"
 	printf '[/UNTRUSTED-DATA-%s]\n' "$boundary_id"
 
@@ -246,11 +268,17 @@ cmd_wrap() {
 	local scan_result scan_exit
 	scan_result=$(printf '%s' "$content" | RUNTIME_SCAN_QUIET="${RUNTIME_SCAN_QUIET}" cmd_scan --type "$content_type" --source "$source" 2>/dev/null) && scan_exit=0 || scan_exit=$?
 
+	# Handle scan failure — don't wrap content that couldn't be scanned
+	if [[ "$scan_exit" -ne 0 && "$scan_exit" -ne 1 ]]; then
+		_rs_log_error "Failed to scan ${content_type} content from ${source} (exit: ${scan_exit})"
+		return 2
+	fi
+
 	# If findings detected, prepend a warning before the wrapped content
 	if [[ "$scan_exit" -eq 1 ]]; then
 		local max_severity="UNKNOWN"
 		if command -v jq &>/dev/null && [[ -n "$scan_result" ]]; then
-			max_severity=$(printf '%s' "$scan_result" | jq -r '.max_severity // "UNKNOWN"' 2>/dev/null) || max_severity="UNKNOWN"
+			max_severity=$(printf '%s' "$scan_result" | jq -r '.max_severity // "UNKNOWN"') || max_severity="UNKNOWN"
 		fi
 		printf 'WARNING: Prompt injection patterns detected (severity: %s) in %s from %s.\n' \
 			"$max_severity" "$content_type" "$source"
@@ -344,12 +372,16 @@ _rs_log_scan() {
 			'{timestamp: $ts, content_type: $type, source: $source, result: $result, finding_count: $findings, max_severity: $severity, byte_count: $bytes, scan_duration_ms: $duration, risk_level: $risk, policy: $policy, worker_id: $worker, session_id: $session}' \
 			>>"$log_file" 2>/dev/null || true
 	else
-		# Fallback without jq
+		# Fallback without jq — escape untrusted values to prevent JSON injection
+		local safe_source safe_worker safe_session
+		safe_source=$(_rs_json_escape "$log_source")
+		safe_worker=$(_rs_json_escape "$RUNTIME_SCAN_WORKER_ID")
+		safe_session=$(_rs_json_escape "$RUNTIME_SCAN_SESSION_ID")
 		printf '{"timestamp":"%s","content_type":"%s","source":"%s","result":"%s","finding_count":%d,"max_severity":"%s","byte_count":%d,"scan_duration_ms":%d,"risk_level":"%s","policy":"%s","worker_id":"%s","session_id":"%s"}\n' \
-			"$timestamp" "$content_type" "$log_source" "$result" \
+			"$timestamp" "$content_type" "$safe_source" "$result" \
 			"$finding_count" "$max_severity" "$byte_count" "$scan_duration_ms" \
-			"$risk_level" "$policy" "$RUNTIME_SCAN_WORKER_ID" "$RUNTIME_SCAN_SESSION_ID" \
-			>>"$log_file" 2>/dev/null || true
+			"$risk_level" "$policy" "$safe_worker" "$safe_session" \
+			>>"$log_file" || true
 	fi
 
 	return 0
@@ -508,8 +540,12 @@ cmd_scan() {
 				--arg policy "$policy" \
 				'{result: $result, content_type: $type, source: $source, finding_count: $count, max_severity: $severity, policy: $policy}'
 		else
+			# Escape untrusted values to prevent JSON injection
+			local safe_source safe_type
+			safe_source=$(_rs_json_escape "$source")
+			safe_type=$(_rs_json_escape "$content_type")
 			printf '{"result":"findings","content_type":"%s","source":"%s","finding_count":%d,"max_severity":"%s","policy":"%s"}\n' \
-				"$content_type" "$source" "$finding_count" "$max_severity" "$policy"
+				"$safe_type" "$safe_source" "$finding_count" "$max_severity" "$policy"
 		fi
 
 		# Also output the detailed findings to stderr for agent context
@@ -554,7 +590,7 @@ cmd_scan_file() {
 		return 2
 	fi
 
-	cat "$file_path" | cmd_scan --type "$content_type" --source "$file_path"
+	cat -- "$file_path" | cmd_scan --type "$content_type" --source "$file_path"
 	return $?
 }
 
@@ -574,7 +610,7 @@ cmd_scan_url() {
 	fi
 
 	local content
-	content=$(curl -sL --max-time 30 "$url" 2>/dev/null) || {
+	content=$(curl -sL --max-time 30 -- "$url") || {
 		_rs_log_error "Failed to fetch URL: $url"
 		return 2
 	}
