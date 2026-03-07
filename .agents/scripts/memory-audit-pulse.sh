@@ -736,7 +736,7 @@ cmd_status() {
 		local total
 		total=$(db "$MEMORY_DB" "SELECT COUNT(*) FROM learnings;" 2>/dev/null || echo "0")
 		local consolidations
-		consolidations=$(db "$MEMORY_DB" "SELECT COUNT(*) FROM memory_consolidations;" 2>/dev/null || echo "0")
+		consolidations=$(db "$MEMORY_DB" "SELECT COUNT(*) FROM memory_consolidations;" || echo "0")
 		local db_size
 		db_size=$(du -h "$MEMORY_DB" | cut -f1)
 		log_info "Memory DB: $total memories, $consolidations consolidations, $db_size"
@@ -778,8 +778,9 @@ PHASES:
     3. Graduate     Promote high-value memories to shared docs
     4. Consolidate  Cross-memory insight generation via LLM (haiku)
                     Finds connections between memories and generates
-                    synthesized insights. Requires ai-research-helper.sh
-                    and Anthropic API key. Skips gracefully if unavailable.
+                    synthesized insights stored as derives relations.
+                    Requires ai-research-helper.sh and Anthropic API key.
+                    Skips gracefully if unavailable.
     5. Scan         Identify self-improvement opportunities:
                     - Recurring failure patterns
                     - Popular but low-confidence memories

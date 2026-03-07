@@ -15,8 +15,8 @@ mode: subagent
 Add a **memory consolidation phase** to `memory-audit-pulse.sh` that uses a cheap LLM call (haiku-tier, ~$0.001/call) to scan unconsolidated memories, discover cross-cutting connections, and store synthesized insights as new `derives` relations in the existing `learning_relations` table.
 
 Deliverables:
-1. New `phase_consolidate()` function in `memory-audit-pulse.sh` (Phase 4, between graduate and opportunity scan)
-2. New `insights` subcommand in `memory-helper.sh` for manual invocation
+1. New `phase_consolidate()` function in `memory-audit-pulse.sh` (Phase 4, renumbering opportunity scan to Phase 5 and report to Phase 6)
+2. New `insights` subcommand in `memory-helper.sh` for manual invocation (delegates to audit pulse with `--force`)
 3. New `memory_consolidations` table for storing consolidation insights with source memory IDs
 4. Documentation updates in `memory/README.md`
 
@@ -58,47 +58,61 @@ Cost is negligible (~$0.001-0.01 per audit pulse run on 10-50 memories). Value i
 ## Acceptance Criteria
 
 - [ ] `memory-audit-pulse.sh run --force` includes consolidation phase in output
+
   ```yaml
   verify:
     method: bash
     run: "grep -q 'phase_consolidate\\|Phase.*[Cc]onsolidat' .agents/scripts/memory-audit-pulse.sh"
   ```
+
 - [ ] `memory-helper.sh consolidate` triggers consolidation manually
+
   ```yaml
   verify:
     method: bash
     run: "grep -q 'consolidate)' .agents/scripts/memory-helper.sh"
   ```
+
 - [ ] `memory_consolidations` table created in init_db migration
+
   ```yaml
   verify:
     method: bash
     run: "grep -q 'memory_consolidations' .agents/scripts/memory/_common.sh"
   ```
+
 - [ ] Consolidation uses ai-research-helper.sh with haiku model tier
+
   ```yaml
   verify:
     method: bash
     run: "grep -q 'ai-research-helper\\|ai_research' .agents/scripts/memory-audit-pulse.sh"
   ```
+
 - [ ] Consolidation results stored as `derives` relations in `learning_relations`
+
   ```yaml
   verify:
     method: bash
     run: "grep -q 'derives' .agents/scripts/memory-audit-pulse.sh"
   ```
+
 - [ ] Documentation updated in memory/README.md
+
   ```yaml
   verify:
     method: bash
     run: "grep -qi 'consolidat' .agents/memory/README.md"
   ```
+
 - [ ] ShellCheck clean on modified scripts
+
   ```yaml
   verify:
     method: bash
     run: "shellcheck .agents/scripts/memory-audit-pulse.sh .agents/scripts/memory-helper.sh .agents/scripts/memory/_common.sh"
   ```
+
 - [ ] Dry-run mode skips LLM call and reports what would be consolidated
 - [ ] Graceful degradation: if ai-research-helper.sh is unavailable, skip phase with warning
 

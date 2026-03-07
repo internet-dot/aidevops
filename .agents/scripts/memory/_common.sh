@@ -690,8 +690,8 @@ try:
         if r.get('type') == '$type' and float(r.get('score', 0)) >= $semantic_threshold:
             print(r['id'])
             break
-except Exception:
-    pass
+except (json.JSONDecodeError, ValueError, KeyError, TypeError) as e:
+    print(f'Semantic duplicate check: parse error: {e}', file=sys.stderr)
 " <<<"$search_result" 2>/dev/null || echo "")
 	fi
 
