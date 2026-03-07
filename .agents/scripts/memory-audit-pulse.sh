@@ -337,6 +337,8 @@ Only include memory IDs that actually appear in the MEMORIES above."
 	}
 
 	# Strip markdown code fences if present (LLMs sometimes wrap JSON)
+	# Backticks in sed are literal, not command substitution
+	# shellcheck disable=SC2016
 	response=$(echo "$response" | sed 's/^```json//; s/^```//; s/```$//' | tr -d '\n')
 
 	# Parse the response — jq preferred, python3 fallback
