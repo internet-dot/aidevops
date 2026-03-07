@@ -13,7 +13,7 @@
 #
 # Uses isolated temp directories to avoid touching production data.
 #
-# Usage: bash tests/test-memory-pressure-monitor.sh [--verbose]
+# Usage: bash tests/test-memory-pressure-monitor.sh
 #
 # Exit codes: 0 = all pass, 1 = failures found
 
@@ -21,8 +21,6 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_UNDER_TEST="$REPO_DIR/.agents/scripts/memory-pressure-monitor.sh"
-VERBOSE="${1:-}"
-
 # --- Test Framework ---
 PASS_COUNT=0
 FAIL_COUNT=0

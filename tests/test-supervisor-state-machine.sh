@@ -10,7 +10,7 @@
 #
 # Uses an isolated temp DB to avoid touching production data.
 #
-# Usage: bash tests/test-supervisor-state-machine.sh [--verbose]
+# Usage: bash tests/test-supervisor-state-machine.sh
 #
 # Exit codes: 0 = all pass, 1 = failures found
 
@@ -19,8 +19,6 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPTS_DIR="$REPO_DIR/.agents/scripts"
 SUPERVISOR_SCRIPT="$SCRIPTS_DIR/supervisor-helper.sh"
-VERBOSE="${1:-}"
-
 # --- Test Framework ---
 PASS_COUNT=0
 FAIL_COUNT=0
