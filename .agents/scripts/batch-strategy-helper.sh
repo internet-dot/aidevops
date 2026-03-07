@@ -187,8 +187,8 @@ parse_args() {
 			log_error "Tasks JSON is required for '$COMMAND' command (use --tasks or --tasks-file)"
 			return 1
 		fi
-		# Validate it's valid JSON
-		if ! echo "$TASKS_JSON" | jq empty 2>/dev/null; then
+		# Validate it's valid JSON (preserve stderr for debugging)
+		if ! echo "$TASKS_JSON" | jq empty >/dev/null; then
 			log_error "Invalid JSON in tasks input"
 			return 1
 		fi
@@ -199,40 +199,8 @@ parse_args() {
 }
 
 #######################################
-# Check if a task's blockers are all resolved
-# Arguments:
-#   $1 - task JSON object (single task)
-#   $2 - full tasks JSON array
-# Returns: 0 if all blockers resolved, 1 if still blocked
-#######################################
-is_task_unblocked() {
-	local task="$1"
-	local all_tasks="$2"
-
-	local blocked_by
-	blocked_by=$(echo "$task" | jq -r '.blocked_by // [] | .[]' 2>/dev/null)
-
-	if [[ -z "$blocked_by" ]]; then
-		return 0
-	fi
-
-	local blocker_id
-	while IFS= read -r blocker_id; do
-		[[ -z "$blocker_id" ]] && continue
-		local blocker_status
-		blocker_status=$(echo "$all_tasks" | jq -r --arg id "$blocker_id" \
-			'.[] | select(.id == $id) | .status' 2>/dev/null)
-
-		if [[ "$blocker_status" != "completed" ]]; then
-			return 1
-		fi
-	done <<<"$blocked_by"
-
-	return 0
-}
-
-#######################################
 # Get dispatchable tasks (pending + unblocked)
+# Single jq pass: filters pending tasks whose blockers are all completed.
 # Arguments:
 #   $1 - tasks JSON array
 # Output: JSON array of dispatchable task objects
@@ -240,27 +208,17 @@ is_task_unblocked() {
 get_dispatchable_tasks() {
 	local all_tasks="$1"
 
-	# Filter to pending tasks first
-	local pending_tasks
-	pending_tasks=$(echo "$all_tasks" | jq '[.[] | select(.status == "pending")]')
-
-	local result="[]"
-	local task_count
-	task_count=$(echo "$pending_tasks" | jq 'length')
-
-	local i=0
-	while [[ $i -lt "$task_count" ]]; do
-		local task
-		task=$(echo "$pending_tasks" | jq ".[$i]")
-
-		if is_task_unblocked "$task" "$all_tasks"; then
-			result=$(echo "$result" | jq --argjson task "$task" '. + [$task]')
-		fi
-
-		i=$((i + 1))
-	done
-
-	echo "$result"
+	echo "$all_tasks" | jq '
+		# Create a lookup map of task IDs to statuses for efficient checking
+		(map({(.id): .status}) | add) as $statuses
+		|
+		# Filter for pending tasks whose blockers are all completed
+		[
+			.[]
+			| select(.status == "pending")
+			| select((.blocked_by // []) | all($statuses[.] == "completed"))
+		]
+	'
 	return 0
 }
 
@@ -300,46 +258,18 @@ order_depth_first() {
 	local grouped
 	grouped=$(group_by_parent "$tasks")
 
-	# Get sorted branch keys (parent IDs) for deterministic ordering
-	local branches
-	branches=$(echo "$grouped" | jq -r 'keys | sort | .[]')
-
-	local batches="[]"
-
-	local branch
-	while IFS= read -r branch; do
-		[[ -z "$branch" ]] && continue
-
-		# Get task IDs for this branch, sorted by ID for deterministic order
-		local branch_task_ids
-		branch_task_ids=$(echo "$grouped" | jq -r --arg b "$branch" \
-			'.[$b] | sort_by(.id) | .[].id')
-
-		# Split into batches of $concurrency size
-		local batch="[]"
-		local batch_count=0
-
-		local task_id
-		while IFS= read -r task_id; do
-			[[ -z "$task_id" ]] && continue
-
-			batch=$(echo "$batch" | jq --arg id "$task_id" '. + [$id]')
-			batch_count=$((batch_count + 1))
-
-			if [[ "$batch_count" -ge "$concurrency" ]]; then
-				batches=$(echo "$batches" | jq --argjson b "$batch" '. + [$b]')
-				batch="[]"
-				batch_count=0
-			fi
-		done <<<"$branch_task_ids"
-
-		# Add remaining tasks in the last partial batch
-		if [[ "$batch_count" -gt 0 ]]; then
-			batches=$(echo "$batches" | jq --argjson b "$batch" '. + [$b]')
-		fi
-	done <<<"$branches"
-
-	echo "$batches"
+	# Single jq pass: iterate sorted branches, chunk each branch's task IDs
+	# into concurrency-sized batches
+	echo "$grouped" | jq --argjson c "$concurrency" '
+		. as $grouped |
+		[
+			keys_unsorted | sort[] | . as $branch |
+			# Get sorted task IDs for this branch
+			($grouped[$branch] | sort_by(.id) | [.[].id]) as $ids |
+			# Split into concurrency-sized chunks
+			[range(0; ($ids | length); $c)] | .[] | $ids[.:(.+$c)]
+		]
+	'
 	return 0
 }
 
@@ -479,85 +409,83 @@ cmd_next_batch() {
 # Validate task dependency graph
 #######################################
 cmd_validate() {
+	# Perform all validation in a single jq pass for correctness and performance.
+	# This replaces the previous shell-loop approach which had:
+	#   - grep injection vulnerabilities (no -F flag)
+	#   - flawed cycle detection (false positives on diamond graphs, false negatives
+	#     on multi-branch cycles due to shared visited set and current overwrite)
+	#   - O(n*m) jq invocations in shell loops
 	local result
-	result=$(jq -n '{valid: true, errors: [], warnings: []}')
+	result=$(echo "$TASKS_JSON" | jq '
+		# Build lookup maps
+		(map({(.id): .}) | add) as $by_id |
+		([.[].id] | unique) as $all_ids |
+		(map({(.id): (.blocked_by // [])}) | add) as $deps |
+
+		# Check 1: Duplicate task IDs
+		(if ([.[].id] | length) != ($all_ids | length)
+		 then ["Duplicate task IDs found"] else [] end) as $dup_errors |
+
+		# Check 2: blocked_by references to non-existent tasks
+		([.[].blocked_by // [] | .[] |
+		  select(. as $bid | $all_ids | index($bid) | not)] | unique |
+		 map("blocked_by references non-existent task: \(.)")) as $ref_errors |
+
+		# Check 3: Circular dependency detection (proper DFS with path tracking)
+		# Uses a recursive DFS via reduce. For each starting node, walk the
+		# dependency graph tracking the current path (ancestors). A cycle exists
+		# when we encounter a node already on the current path. A "processed"
+		# set avoids redundant traversal of already-verified subgraphs.
+		(reduce $all_ids[] as $start (
+			{errors: [], processed: []};
+			if (.processed | index($start)) then .
+			else
+				# DFS from $start using an explicit stack
+				# Stack entries: {node, path (ancestor chain)}
+				{stack: [{node: $start, path: []}], processed: .processed, errors: .errors}
+				| until(.stack | length == 0;
+					.stack[-1] as $top |
+					.stack[:-1] as $rest |
+					if ($top.path | index($top.node)) then
+						# Cycle detected: node is already in its own ancestor path
+						.errors += ["Circular dependency detected: \($top.path | join(" -> ")) -> \($top.node)"]
+						| .stack = $rest
+					elif (.processed | index($top.node)) then
+						# Already fully explored this node
+						.stack = $rest
+					else
+						.processed += [$top.node]
+						| ($deps[$top.node] // []) as $children
+						| .stack = $rest + [$children[] | {node: ., path: ($top.path + [$top.node])}]
+					end
+				)
+			end
+		) | .errors) as $cycle_errors |
+
+		# Check 4: Tasks with no parent_id
+		([.[] | select(.parent_id == null or .parent_id == "")] | length) as $orphan_count |
+		(if $orphan_count > 0
+		 then ["\($orphan_count) task(s) have no parent_id — they will form their own branch"]
+		 else [] end) as $orphan_warnings |
+
+		# Check 5: Deeply nested tasks (depth > 3)
+		([.[] | select((.depth // 0) > 3)] | length) as $deep_count |
+		(if $deep_count > 0
+		 then ["\($deep_count) task(s) exceed recommended depth limit of 3"]
+		 else [] end) as $deep_warnings |
+
+		# Assemble result
+		($dup_errors + $ref_errors + $cycle_errors) as $all_errors |
+		($orphan_warnings + $deep_warnings) as $all_warnings |
+		{
+			valid: ($all_errors | length == 0),
+			errors: $all_errors,
+			warnings: $all_warnings
+		}
+	')
 
 	local task_count
 	task_count=$(echo "$TASKS_JSON" | jq 'length')
-
-	# Check 1: All task IDs are unique
-	local unique_count
-	unique_count=$(echo "$TASKS_JSON" | jq '[.[].id] | unique | length')
-	if [[ "$unique_count" -ne "$task_count" ]]; then
-		result=$(echo "$result" | jq '.valid = false | .errors += ["Duplicate task IDs found"]')
-	fi
-
-	# Check 2: All blocked_by references point to existing tasks
-	local all_ids
-	all_ids=$(echo "$TASKS_JSON" | jq -r '.[].id')
-
-	local all_blockers
-	all_blockers=$(echo "$TASKS_JSON" | jq -r '.[].blocked_by // [] | .[]' 2>/dev/null | sort -u)
-
-	local blocker_id
-	while IFS= read -r blocker_id; do
-		[[ -z "$blocker_id" ]] && continue
-		if ! echo "$all_ids" | grep -qx "$blocker_id"; then
-			result=$(echo "$result" | jq --arg id "$blocker_id" \
-				'.valid = false | .errors += ["blocked_by references non-existent task: \($id)"]')
-		fi
-	done <<<"$all_blockers"
-
-	# Check 3: Detect circular dependencies (simple DFS)
-	local has_cycle=false
-	local task_id
-	while IFS= read -r task_id; do
-		[[ -z "$task_id" ]] && continue
-		local visited="$task_id"
-		local current="$task_id"
-		local depth=0
-
-		while [[ $depth -lt 20 ]]; do
-			local deps
-			deps=$(echo "$TASKS_JSON" | jq -r --arg id "$current" \
-				'.[] | select(.id == $id) | .blocked_by // [] | .[]' 2>/dev/null)
-
-			if [[ -z "$deps" ]]; then
-				break
-			fi
-
-			local dep
-			while IFS= read -r dep; do
-				[[ -z "$dep" ]] && continue
-				if echo "$visited" | grep -qx "$dep"; then
-					has_cycle=true
-					result=$(echo "$result" | jq --arg id "$task_id" --arg dep "$dep" \
-						'.valid = false | .errors += ["Circular dependency detected: \($id) -> ... -> \($dep)"]')
-					break 2
-				fi
-				visited="${visited}"$'\n'"${dep}"
-				current="$dep"
-			done <<<"$deps"
-
-			depth=$((depth + 1))
-		done
-	done <<<"$all_ids"
-
-	# Check 4: Warn about tasks with no parent_id
-	local orphan_count
-	orphan_count=$(echo "$TASKS_JSON" | jq '[.[] | select(.parent_id == null or .parent_id == "")] | length')
-	if [[ "$orphan_count" -gt 0 ]]; then
-		result=$(echo "$result" | jq --arg n "$orphan_count" \
-			'.warnings += ["\($n) task(s) have no parent_id — they will form their own branch"]')
-	fi
-
-	# Check 5: Warn about deeply nested tasks (depth > 3)
-	local deep_count
-	deep_count=$(echo "$TASKS_JSON" | jq '[.[] | select((.depth // 0) > 3)] | length')
-	if [[ "$deep_count" -gt 0 ]]; then
-		result=$(echo "$result" | jq --arg n "$deep_count" \
-			'.warnings += ["\($n) task(s) exceed recommended depth limit of 3"]')
-	fi
 
 	local is_valid
 	is_valid=$(echo "$result" | jq -r '.valid')
