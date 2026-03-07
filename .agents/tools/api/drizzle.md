@@ -228,27 +228,33 @@ import { db } from "../server";
 import { users, posts } from "../schema";
 
 async function seed() {
-  // Safety: prevent accidental production seeding
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("Seeding is disabled in production. Set NODE_ENV=development.");
+  // Safety: prevent accidental data wipe in production
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_DB_WIPE !== "true") {
+    throw new Error(
+      "Seeding with destructive deletes is disabled in production. " +
+      "Set ALLOW_DB_WIPE=true to override (use with caution)."
+    );
   }
 
-  console.log("Seeding database...");
+  console.log(`Seeding database (NODE_ENV=${process.env.NODE_ENV ?? "undefined"})...`);
 
-  // Clear existing data
-  await db.delete(posts);
-  await db.delete(users);
+  // Wrap in transaction so a failed insert doesn't leave the DB empty
+  await db.transaction(async (tx) => {
+    // Clear existing data (order matters: delete children before parents)
+    await tx.delete(posts);
+    await tx.delete(users);
 
-  // Insert seed data
-  const [user] = await db
-    .insert(users)
-    .values({ email: "admin@example.com", name: "Admin" })
-    .returning();
+    // Insert seed data
+    const [user] = await tx
+      .insert(users)
+      .values({ email: "admin@example.com", name: "Admin" })
+      .returning();
 
-  await db.insert(posts).values([
-    { title: "First Post", authorId: user.id },
-    { title: "Second Post", authorId: user.id },
-  ]);
+    await tx.insert(posts).values([
+      { title: "First Post", authorId: user.id },
+      { title: "Second Post", authorId: user.id },
+    ]);
+  });
 
   console.log("Seeding complete!");
 }
