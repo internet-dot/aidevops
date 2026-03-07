@@ -8,9 +8,10 @@
 #   - Content-type-aware scanning thresholds
 #   - Pipeline-friendly exit codes and output
 #
-# This is the enforcement layer — making scanning happen by default in
-# worker pipelines rather than relying on agents to remember to call
-# the scanner manually.
+# This is the automated scanning/annotation layer — making scanning happen
+# by default in worker pipelines rather than relying on agents to remember
+# to call the scanner manually. Actual enforcement is handled by sandboxing,
+# scoped tokens (t1412.2), and network controls (t1412.3).
 #
 # Usage:
 #   runtime-scan-helper.sh scan --type webfetch --source "https://example.com" < content
@@ -219,10 +220,18 @@ cmd_wrap() {
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		--type)
+			if [[ $# -lt 2 || -z "${2:-}" || "${2:0:2}" == "--" ]]; then
+				_rs_log_error "Missing value for --type"
+				return 2
+			fi
 			content_type="$2"
 			shift 2
 			;;
 		--source)
+			if [[ $# -lt 2 || -z "${2:-}" || "${2:0:2}" == "--" ]]; then
+				_rs_log_error "Missing value for --source"
+				return 2
+			fi
 			source="$2"
 			shift 2
 			;;
@@ -407,10 +416,18 @@ cmd_scan() {
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		--type)
+			if [[ $# -lt 2 || -z "${2:-}" || "${2:0:2}" == "--" ]]; then
+				_rs_log_error "Missing value for --type"
+				return 2
+			fi
 			content_type="$2"
 			shift 2
 			;;
 		--source)
+			if [[ $# -lt 2 || -z "${2:-}" || "${2:0:2}" == "--" ]]; then
+				_rs_log_error "Missing value for --source"
+				return 2
+			fi
 			source="$2"
 			shift 2
 			;;
@@ -487,7 +504,7 @@ cmd_scan() {
 	# with finding_count, max_severity, and findings array — avoiding fragile
 	# grep-based parsing of human-formatted stderr.
 	local scan_output scan_exit
-	scan_output=$(printf '%s' "$content" | PROMPT_GUARD_QUIET="true" "$PROMPT_GUARD_HELPER" scan-content --type "$content_type" --source "$source" 2>/dev/null) && scan_exit=0 || scan_exit=$?
+	scan_output=$(printf '%s' "$content" | PROMPT_GUARD_QUIET="true" "$PROMPT_GUARD_HELPER" scan-content --type "$content_type" --source "$source") && scan_exit=0 || scan_exit=$?
 
 	local end_time
 	end_time=$(date +%s%N 2>/dev/null || date +%s)
@@ -598,6 +615,10 @@ cmd_scan_file() {
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		--type)
+			if [[ $# -lt 2 || -z "${2:-}" || "${2:0:2}" == "--" ]]; then
+				_rs_log_error "Missing value for --type"
+				return 2
+			fi
 			content_type="$2"
 			shift 2
 			;;
@@ -661,6 +682,10 @@ cmd_report() {
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		--tail)
+			if [[ $# -lt 2 || -z "${2:-}" || "${2:0:2}" == "--" ]]; then
+				_rs_log_error "Missing value for --tail"
+				return 2
+			fi
 			tail_count="$2"
 			shift 2
 			;;

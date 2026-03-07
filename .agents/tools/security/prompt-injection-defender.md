@@ -645,7 +645,7 @@ Each boundary tag has a unique ID, preventing attackers from crafting content th
 
 Two optimizations from stackoneHQ/defender are integrated into `prompt-guard-helper.sh`:
 
-1. **Keyword pre-filter**: Before running expensive regex patterns, a fast keyword check determines if any injection-related terms are present. If no keywords match, the full regex scan is skipped entirely. This provides ~100x speedup for clean content (the common case in production).
+1. **Keyword pre-filter**: Before running expensive regex patterns, a fast keyword check determines if any injection-related terms are present. If no keywords match, a smaller set of structural checks (invisible characters, URL-encoded payloads, escape sequences, fake delimiters, homoglyphs) is run before declaring content clean — the full regex scan is avoided but structural attacks are still caught. This provides ~100x speedup for clean content (the common case in production). The fast-path is automatically disabled when YAML or custom pattern files are loaded, since those may contain trigger terms not covered by the built-in keyword list.
 
 2. **NFKC Unicode normalization**: Before pattern matching, content is normalized using Unicode NFKC normalization (via Python's `unicodedata.normalize`). This closes bypass techniques using fullwidth characters (`ｉｇｎｏｒｅ`), mathematical symbols (`𝐢𝐠𝐧𝐨𝐫𝐞`), modifier letters, and circled characters. Both the normalized and original forms are scanned to catch both raw Unicode attacks (homoglyphs) and normalized bypasses.
 

@@ -46,7 +46,7 @@ set -euo pipefail
 # ============================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || exit 1
-source "${SCRIPT_DIR}/shared-constants.sh" 2>/dev/null || true
+source "${SCRIPT_DIR}/shared-constants.sh" || true
 
 # Fallback colours if shared-constants.sh not loaded
 [[ -z "${RED+x}" ]] && RED='\033[0;31m'
@@ -684,11 +684,32 @@ _pg_scan_message() {
 	# Fast check — if no injection keywords are present, skip the expensive
 	# regex scan entirely. ~100x faster for clean content (the common case).
 	# Run against both original and normalized forms.
-	if ! _pg_keyword_prefilter "$message" && ! _pg_keyword_prefilter "$normalized_message"; then
-		# No keywords found. Before returning clean, run structural checks
-		# that detect patterns without keywords: URL-encoded payloads,
-		# repeated escape sequences, fake delimiters/role markers,
-		# homoglyphs, and invisible/zero-width characters.
+	#
+	# IMPORTANT: The fast-path is only safe when using the built-in inline
+	# patterns, whose keywords are all covered by _PG_KEYWORDS. When YAML
+	# or custom patterns are loaded, they may contain trigger terms not in
+	# the keyword list, so the fast-path must be disabled to avoid false
+	# negatives.
+	local _has_dynamic_patterns="false"
+	local custom_file="${PROMPT_GUARD_CUSTOM_PATTERNS:-}"
+	if [[ -n "$custom_file" && -f "$custom_file" ]]; then
+		_has_dynamic_patterns="true"
+	fi
+	if [[ "$_has_dynamic_patterns" == "false" ]]; then
+		# Check if YAML patterns are available (without loading them yet)
+		local _yaml_check=""
+		_yaml_check=$(_pg_find_yaml_patterns 2>/dev/null) || true
+		if [[ -n "$_yaml_check" ]]; then
+			_has_dynamic_patterns="true"
+		fi
+	fi
+
+	if [[ "$_has_dynamic_patterns" == "false" ]] && ! _pg_keyword_prefilter "$message" && ! _pg_keyword_prefilter "$normalized_message"; then
+		# No keywords found and no dynamic patterns to check.
+		# Before returning clean, run structural checks that detect
+		# patterns without keywords: URL-encoded payloads, repeated
+		# escape sequences, fake delimiters/role markers, homoglyphs,
+		# and invisible/zero-width characters.
 		# These are lightweight checks (~10 regex tests) — much cheaper
 		# than the full pattern set but catch keyword-free attacks.
 		local has_structural="false"
@@ -1106,6 +1127,10 @@ cmd_log() {
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		--tail)
+			if [[ $# -lt 2 || -z "${2:-}" || "${2:0:2}" == "--" ]]; then
+				_pg_log_error "Missing value for --tail"
+				return 1
+			fi
 			tail_count="$2"
 			shift 2
 			;;
@@ -1848,7 +1873,7 @@ cmd_scan_content() {
 			shift 2
 			;;
 		*)
-			_pg_log_error "Unknown argument: $1"
+			_pg_log_error "Unknown argument for scan-content: $1"
 			return 2
 			;;
 		esac
@@ -1875,7 +1900,7 @@ cmd_scan_content() {
 		local safe_type safe_src
 		safe_type=$(_pg_json_escape "$content_type")
 		safe_src=$(_pg_json_escape "${source_id:-unknown}")
-		printf '{"result":"clean","finding_count":0,"max_severity":"NONE","content_type":"%s","source":"%s"}\n' \
+		printf '{"result":"clean","finding_count":0,"max_severity":"NONE","content_type":"%s","source":"%s","byte_count":0}\n' \
 			"$safe_type" "$safe_src"
 		return 0
 	fi
