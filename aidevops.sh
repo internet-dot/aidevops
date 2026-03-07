@@ -1391,6 +1391,83 @@ Create `.md` files in this directory for domain-specific context:
 
 Each file is read on demand by AI assistants when relevant to the task.
 AGENTSEOF
+
+		# Append Security section if security feature is enabled (t1412.11)
+		if [[ "$enable_security" == "true" ]]; then
+			if [[ -f "$project_root/package.json" ]]; then
+				# JS/TS repo — recommend @stackone/defender + framework guidance
+				cat >>"$project_root/.agents/AGENTS.md" <<'SECEOF'
+
+## Security
+
+### Prompt Injection Defense
+
+Any feature that passes user input to an LLM (chatbots, AI assistants, RAG
+pipelines, tool-calling agents) is a prompt injection surface. Treat all
+user-supplied text as untrusted — the same way you treat SQL input.
+
+**For this project** (JS/TS with package.json detected):
+
+- Use [`@stackone/defender`](https://github.com/ArcadeAI/defender) to validate
+  LLM inputs and outputs. It provides middleware for Express/Fastify/Next.js
+  that detects and blocks injection attempts before they reach the model.
+- Never concatenate user input directly into system prompts. Use structured
+  message arrays with clear role boundaries (`system`, `user`, `assistant`).
+- Validate and sanitize tool-call arguments returned by the model before
+  executing them. Models can be manipulated into calling tools with malicious
+  parameters.
+
+### Dependency Security
+
+- Run `npm audit` regularly and before releases.
+- Pin third-party GitHub Actions to SHA (not branch/tag).
+- Review `aidevops security audit` output for this repo's posture.
+
+### Framework Security Docs
+
+See `~/.aidevops/agents/tools/security/prompt-injection-defender.md` for the
+full prompt injection defense methodology and scanner integration.
+SECEOF
+			else
+				# Non-JS/TS repo — framework-agnostic guidance
+				cat >>"$project_root/.agents/AGENTS.md" <<'SECEOF'
+
+## Security
+
+### Prompt Injection Defense
+
+Any feature that passes user input to an LLM (chatbots, AI assistants, RAG
+pipelines, tool-calling agents) is a prompt injection surface. Treat all
+user-supplied text as untrusted — the same way you treat SQL input.
+
+**Guidelines:**
+
+- Never concatenate user input directly into system prompts. Use structured
+  message arrays with clear role boundaries (`system`, `user`, `assistant`).
+- Validate and sanitize tool-call arguments returned by the model before
+  executing them. Models can be manipulated into calling tools with malicious
+  parameters.
+- Scan untrusted content (web fetches, user uploads, external API responses)
+  before including it in LLM context. Use pattern-based detection as a first
+  layer, with model-based classification for higher assurance.
+- Apply least-privilege to any tools or APIs the LLM can invoke. Scope
+  permissions to the minimum required for the task.
+
+### Dependency Security
+
+- Run your language's audit tool regularly (`npm audit`, `pip-audit`,
+  `cargo audit`, etc.) and before releases.
+- Pin third-party GitHub Actions to SHA (not branch/tag).
+- Review `aidevops security audit` output for this repo's posture.
+
+### Framework Security Docs
+
+See `~/.aidevops/agents/tools/security/prompt-injection-defender.md` for the
+full prompt injection defense methodology and scanner integration.
+SECEOF
+			fi
+		fi
+
 		print_success "Created .agents/AGENTS.md"
 	fi
 
@@ -1834,7 +1911,7 @@ SOPSEOF
 	[[ "$enable_database" == "true" ]] && echo "  ✓ Database (schemas/, migrations/, seeds/)"
 	[[ "$enable_beads" == "true" ]] && echo "  ✓ Beads (task graph visualization)"
 	[[ "$enable_sops" == "true" ]] && echo "  ✓ SOPS (encrypted config files with age backend)"
-	[[ "$enable_security" == "true" ]] && echo "  ✓ Security (per-repo posture assessment)"
+	[[ "$enable_security" == "true" ]] && echo "  ✓ Security (posture assessment, AGENTS.md security guidance)"
 	[[ -f "$project_root/MODELS.md" ]] && echo "  ✓ MODELS.md (per-repo model performance leaderboard)"
 	echo ""
 	echo "Next steps:"
@@ -2259,6 +2336,8 @@ cmd_features() {
 	echo "                 - Review-bot-gate status check"
 	echo "                 - Dependency vulnerability scanning (npm/pip/cargo)"
 	echo "                 - Collaborator access audit"
+	echo "                 - Scaffolds Security section in .agents/AGENTS.md"
+	echo "                 - Stores posture in .aidevops.json"
 	echo "                 - Re-run anytime: aidevops security audit"
 	echo ""
 	echo "Extensibility:"
