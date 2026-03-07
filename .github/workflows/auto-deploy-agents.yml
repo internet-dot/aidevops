@@ -77,9 +77,11 @@ jobs:
           fi
 
           # Store changed files list (truncated for output)
-          echo "changed_files<<EOF" >> "$GITHUB_OUTPUT"
+          # Use unique delimiter to avoid collision if a file path contains "EOF"
+          DELIM="EOF_$(date +%s)"
+          echo "changed_files<<$DELIM" >> "$GITHUB_OUTPUT"
           echo "$CHANGED" | head -50 >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "$DELIM" >> "$GITHUB_OUTPUT"
 
           echo "Detected $CHANGED_COUNT changed agent files ($SCRIPTS_CHANGED scripts)"
 
@@ -202,7 +204,7 @@ jobs:
             [[ -z "$script" ]] && continue
             [[ ! -f "$script" ]] && continue
 
-            if ! bash -n "$script" 2>/dev/null; then
+            if ! bash -n "$script"; then
               echo "::error file=$script::Syntax error in $script"
               FAILED=$((FAILED + 1))
             fi
