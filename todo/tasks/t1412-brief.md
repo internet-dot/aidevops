@@ -178,24 +178,33 @@ Key decisions from the conversation:
 - **Domain data sourced from session transcripts** — analyzed 1337+ GitHub hits, 276 x.com hits, and hundreds of other domains from OpenCode session transcripts to build the tiering baseline. Real usage data, not guesswork.
 - **Content from allowed domains can still contain injections** — the allowlist permits the connection; it doesn't make the content safe. Tier 4 documentation sites, third-party APIs, and project-specific services can all serve injection payloads. Runtime content scanning (Phase 4) addresses this orthogonal concern.
 - **Clinejection reference case** — the attack chained: issue title injection → AI bot executes npm install from typosquatted repo → cache poisoning → credential theft → malicious npm publish. Our workers have the same structural exposure (shell access + untrusted input). The typosquatted repo was on github.com (Tier 1 allowed domain), so domain allowlisting alone wouldn't catch it — command pattern analysis (Phase 5) is needed for that class.
+- **Intelligence over regex for untrusted content** — non-maintainer issue bodies, PR diffs, and linked content should get a haiku-tier semantic injection scan before reaching worker context. Pattern scanning catches known templates; LLM classification catches paraphrased/novel injections. Cost: ~$0.001 per scan, only triggered for non-collaborator content.
+- **Tamper-evident logging via privilege separation** — named pipe to a separate logger process running as a different UID. Worker can write to the pipe but cannot read, modify, or delete the log file. Optional remote syslog forwarding for true tamper-prevention (bytes leave the machine before attacker can delete them). `chattr +a` on Linux as a simpler alternative; macOS `chflags sappnd` is ineffective with SIP.
+- **MCP servers are a distinct trust boundary** — MCP servers run as persistent processes with network access and can inject via tool responses. Users should be warned at install time. Socket.dev is already configured for aidevops and can scan MCP server dependencies.
+- **CI/CD AI agent security is a documentation gap** — our workers run locally, but users may deploy AI triage in their own CI. The Clinejection pattern (AI bot + shell access + cached credentials + untrusted input) applies to any CI/CD AI integration. Guidance belongs in opsec.md with cross-refs from git-workflow.md.
 
 ## Relevant Files
 
 - `.agents/scripts/dispatch.sh` — worker spawning, primary integration point for Phase 1-2
 - `.agents/tools/ai-assistants/headless-dispatch.md` — dispatch guidance docs
 - `.agents/scripts/commands/pulse.md` — pulse dispatch flow
-- `.agents/scripts/prompt-guard-helper.sh` — existing pattern scanner, Phase 4 integration
+- `.agents/scripts/prompt-guard-helper.sh` — existing pattern scanner, Phase 4 + 7 integration
 - `.agents/configs/prompt-injection-patterns.yaml` — pattern database
 - `.agents/tools/security/prompt-injection-defender.md` — security docs to update
+- `.agents/tools/security/opsec.md` — CI/CD security guidance (Phase 9)
+- `.agents/workflows/git-workflow.md` — cross-ref for CI/CD guidance
 - `prompts/build.txt` — framework rules, security section to update
 - `.agents/scripts/aidevops-update-check.sh:239` — startup greeting, insertion point for security posture check
 - `.agents/scripts/security-posture-helper.sh` — new: security posture checker
+- `.agents/tools/mcp-toolkit/mcporter.md` — MCP install flow, add security warnings (Phase 10)
+- `.agents/tools/code-review/skill-scanner.md` — existing skill scanning, extend to MCP servers
+- `.agents/services/monitoring/socket.md` — Socket.dev integration (already configured)
 
 ## Dependencies
 
 - **Blocked by:** nothing — can start immediately
 - **Blocks:** nothing directly, but improves security posture for all pulse-dispatched work
-- **External:** GitHub fine-grained PAT API (Phase 2), possibly `pf`/`iptables` knowledge (Phase 3)
+- **External:** GitHub fine-grained PAT API (Phase 2), possibly `pf`/`iptables` knowledge (Phase 3), Anthropic API for haiku calls (Phase 7)
 
 ## Estimate Breakdown
 
@@ -206,7 +215,10 @@ Key decisions from the conversation:
 | Phase 3: Network tiering | ~4h | Proxy/firewall wrapper, config, logging |
 | Phase 4: Runtime content scanning | ~3h | Hook integration, scan-stdin wiring |
 | Phase 5: Command baseline | ~3h | Logging, anomaly patterns, transcript analysis |
-| Phase 6: Startup security check | ~2h | security-posture-helper.sh, update-check integration, `aidevops security setup` |
-| Documentation | ~1h | Update security docs |
-| Testing | ~2h | End-to-end worker dispatch verification |
-| **Total** | **~20h** | Phases are independent, can be parallelised |
+| Phase 6: Startup security check | ~2h | security-posture-helper.sh, `aidevops security setup` |
+| Phase 7: Intelligence-layer scan | ~3h | Haiku classifier, collaborator check, dispatch integration |
+| Phase 8: Tamper-evident audit logging | ~4h | Named pipe, privileged logger daemon, launchd/systemd |
+| Phase 9: CI/CD AI agent security docs | ~2h | opsec.md section, cross-refs, Clinejection case study |
+| Phase 10: MCP install security warnings | ~2h | mcporter.md, install flow warnings, Socket.dev integration |
+| Testing | ~3h | End-to-end worker dispatch + audit trail verification |
+| **Total** | **~31h** | Phases are independent, can be parallelised |
