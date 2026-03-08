@@ -190,6 +190,43 @@ branch_was_pushed() {
 	return 1
 }
 
+# Check if a branch's remote tracking ref has been deleted (GH#3797)
+# Correctly resolves the branch's actual upstream remote instead of
+# hardcoding 'origin'. This prevents false positives when a branch
+# tracks a non-origin remote (e.g., 'upstream/my-branch').
+# Returns 0 (true) if the branch was pushed but its remote ref no longer exists
+# Returns 1 (false) if the branch was never pushed, or its remote ref still exists
+remote_branch_deleted() {
+	local branch="$1"
+
+	# Must have been pushed to be considered "remote deleted"
+	if ! branch_was_pushed "$branch"; then
+		return 1
+	fi
+
+	# Resolve the actual remote this branch tracks (may be 'origin', 'upstream', etc.)
+	local tracked_remote
+	tracked_remote=$(git config "branch.$branch.remote" 2>/dev/null || echo "")
+
+	if [[ -n "$tracked_remote" ]]; then
+		# Branch has explicit upstream — check that specific remote
+		if git show-ref --verify --quiet "refs/remotes/$tracked_remote/$branch" 2>/dev/null; then
+			# Remote ref still exists — not deleted
+			return 1
+		fi
+		# Remote ref gone on the tracked remote — deleted
+		return 0
+	fi
+
+	# No explicit upstream configured — fall back to checking origin
+	# (covers branches that were pushed but upstream wasn't set via -u)
+	if git show-ref --verify --quiet "refs/remotes/origin/$branch" 2>/dev/null; then
+		return 1
+	fi
+
+	return 0
+}
+
 # Check if a stale remote branch exists for a branch name (t1060)
 # A "stale remote" means refs/remotes/origin/$branch exists but no local branch does.
 # This typically happens when a branch was merged via PR (remote deleted) but the
@@ -319,12 +356,20 @@ handle_stale_remote_branch() {
 
 # Check if worktree has uncommitted changes
 # Excludes aidevops runtime directories that are safe to discard
+# Returns 0 (true) if changes exist or git status fails (fail-safe for destructive paths)
+# Returns 1 (false) if clean
 worktree_has_changes() {
 	local worktree_path="$1"
 	if [[ -d "$worktree_path" ]]; then
 		local changes
 		# Exclude aidevops runtime files: .agents/loop-state/, .agents/tmp/, .DS_Store
-		changes=$(git -C "$worktree_path" status --porcelain 2>/dev/null |
+		# Capture git status exit code separately — if git status fails (corrupt index,
+		# missing HEAD, etc.), treat as "has changes" to prevent data loss on cleanup (GH#3797)
+		changes=$(git -C "$worktree_path" status --porcelain 2>/dev/null) || {
+			# git status failed — treat as unknown/dirty to be safe
+			return 0
+		}
+		changes=$(echo "$changes" |
 			grep -v '^\?\? \.agents/loop-state/' |
 			grep -v '^\?\? \.agents/tmp/' |
 			grep -v '^\?\? \.agents/$' |
@@ -727,8 +772,8 @@ cmd_clean() {
 					merge_type="merged"
 				# Check 2: Remote branch deleted (indicates squash merge or PR closed)
 				# ONLY check this if the branch was previously pushed - unpushed branches should NOT be flagged
-				elif branch_was_pushed "$worktree_branch" &&
-					! git show-ref --verify --quiet "refs/remotes/origin/$worktree_branch" 2>/dev/null; then
+				# Uses remote_branch_deleted() to correctly resolve the tracked remote (GH#3797)
+				elif remote_branch_deleted "$worktree_branch"; then
 					is_merged=true
 					merge_type="remote deleted"
 				# Check 3: Squash-merge detection via GitHub PR state
@@ -817,9 +862,9 @@ cmd_clean() {
 					# Check 1: Traditional merge
 					elif git branch --merged "$default_branch" 2>/dev/null | grep -q "^\s*$worktree_branch$"; then
 						should_remove=true
-					# Check 2: Remote branch deleted - ONLY if branch was previously pushed
-					elif branch_was_pushed "$worktree_branch" &&
-						! git show-ref --verify --quiet "refs/remotes/origin/$worktree_branch" 2>/dev/null; then
+					# Check 2: Remote branch deleted - uses remote_branch_deleted() to
+					# correctly resolve the tracked remote (GH#3797)
+					elif remote_branch_deleted "$worktree_branch"; then
 						should_remove=true
 					# Check 3: Squash-merged PR
 					elif [[ -n "$merged_pr_branches" ]] && echo "$merged_pr_branches" | grep -qx "$worktree_branch"; then
