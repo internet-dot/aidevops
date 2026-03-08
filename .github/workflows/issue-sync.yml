@@ -488,6 +488,8 @@ jobs:
       # fork PRs. It ONLY reads event metadata (PR title, number) — it never
       # checks out or executes code from the PR head branch.
       - name: Apply label from PR title prefix
+        # Fork PRs get read-only GITHUB_TOKEN — labelling will fail gracefully
+        continue-on-error: true
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
