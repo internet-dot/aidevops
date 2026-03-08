@@ -541,14 +541,14 @@ loop_create_receipt() {
 		--arg commit_hash "$commit_hash" \
 		--argjson evidence "$evidence" \
 		'{
-            type: $type,
-            id: $id,
-            iteration: $iteration,
-            timestamp: $timestamp,
-            outcome: $outcome,
-            commit_hash: $commit_hash,
-            evidence: $evidence
-        }' >"$receipt_file"
+			type: $type,
+			id: $id,
+			iteration: $iteration,
+			timestamp: $timestamp,
+			outcome: $outcome,
+			commit_hash: $commit_hash,
+			evidence: $evidence
+		}' >"$receipt_file"
 
 	# Add receipt to state (use --arg for safe escaping)
 	local receipts
