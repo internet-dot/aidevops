@@ -145,14 +145,18 @@ _sd_write_state() {
 	local state_file
 	state_file=$(_sd_state_file)
 
-	# Atomic write via temp file + mv
-	local tmp_file="${state_file}.tmp.$$"
+	# Atomic write via temp file + mv (mktemp for symlink-safe naming)
+	local tmp_file
+	tmp_file=$(mktemp "$(dirname "$state_file")/$(basename "$state_file").tmp.XXXXXX") || {
+		_sd_log_warn "failed to allocate temp state file"
+		return 1
+	}
 	if ! printf '%s\n' "$state_json" >"$tmp_file"; then
 		_sd_log_warn "failed to write temp state file: $tmp_file"
 		rm -f "$tmp_file" 2>/dev/null || true
 		return 1
 	fi
-	if ! mv -f "$tmp_file" "$state_file" 2>/dev/null; then
+	if ! mv -f "$tmp_file" "$state_file"; then
 		_sd_log_warn "failed to move temp state to: $state_file"
 		rm -f "$tmp_file" 2>/dev/null || true
 		return 1
@@ -288,7 +292,7 @@ cmd_label_stuck() {
 		_sd_log_info "confidence $confidence below threshold $STUCK_CONFIDENCE_THRESHOLD for issue #$issue_number — not labeling"
 		# Still record the milestone as checked
 		_sd_record_milestone "$issue_number" "$milestone_min" "$repo_slug" || true
-		return 0
+		return 2 # Checked but skipped — distinct from success (0) and error (1)
 	fi
 
 	# Skip if gh CLI not available
@@ -310,7 +314,7 @@ cmd_label_stuck() {
 	if [[ "${SD_SKIP_GITHUB:-}" == "true" ]]; then
 		_sd_log_info "GitHub operations skipped (SD_SKIP_GITHUB=true)"
 		_sd_record_milestone "$issue_number" "$milestone_min" "$repo_slug" || true
-		return 0
+		return 2 # Checked but skipped — distinct from success (0) and error (1)
 	fi
 
 	# Ensure the stuck-detection label exists
@@ -344,12 +348,15 @@ ${suggested_actions}
 ---
 *This is an advisory notification only. No automated action has been taken. The worker continues running. The \`${STUCK_LABEL}\` label will be automatically removed if the task completes successfully.*"
 
+	local comment_failed=0
 	gh issue comment "$issue_number" --repo "$repo_slug" \
 		--body "$comment_body" || {
 		_sd_log_warn "failed to comment on issue #$issue_number"
+		comment_failed=1
 	}
 
-	# Record milestone and labeled issue in state
+	# Record milestone and labeled issue in state (regardless of comment success,
+	# since the label was applied — skipping state would cause re-labeling).
 	_sd_record_milestone "$issue_number" "$milestone_min" "$repo_slug" || true
 
 	local state
@@ -365,7 +372,7 @@ ${suggested_actions}
 	fi
 
 	_sd_log_warn "labeled issue #$issue_number as stuck (confidence: $confidence, milestone: ${milestone_min}min)"
-	return 0
+	return "$comment_failed"
 }
 
 # Remove stuck-detection label from a GitHub issue on task success.

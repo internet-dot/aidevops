@@ -372,7 +372,7 @@ cmd_create() {
 				log_token "ERROR" "TTL must be a positive integer: ${ttl}"
 				return 1
 			fi
-			if ((ttl > MAX_TTL)); then
+			if ((10#$ttl > MAX_TTL)); then
 				log_token "WARN" "TTL capped at ${MAX_TTL}s (requested ${ttl}s)"
 				ttl=$MAX_TTL
 			fi
