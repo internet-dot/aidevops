@@ -76,7 +76,17 @@ Add a lightweight step to pulse-wrapper.sh (or separate launchd job) that:
 - Outputs summary to pulse log: "3 external items need attention"
 - Does NOT process comment bodies through LLM in the pulse context
 
-### 5. Prompt injection safety (CRITICAL)
+### 5. Notification delivery
+
+Two channels, both zero-cost:
+
+**Terminal greeting** — `aidevops-update-check.sh` already runs on every interactive session start. When `contribution-watch.json` has items needing attention, append a line to the greeting: `"2 external contributions need your reply (run /contributions to see them)."` This is when you're already in a position to act.
+
+**macOS notification** — the launchd scan job fires `osascript -e 'display notification "2 contributions need reply" with title "aidevops"'` when new items are detected. Catches time-sensitive replies between sessions (e.g., maintainer requesting changes on your PR).
+
+Future options (not in scope for v1): email digest via email-agent, messaging bridge via matterbridge/Signal/Slack.
+
+### 6. Prompt injection safety (CRITICAL)
 
 Architecture principle: **the automated system with privileges never processes untrusted content through an LLM. The system that processes untrusted content never has write privileges without human approval.**
 
@@ -102,6 +112,8 @@ Architecture principle: **the automated system with privileges never processes u
 - [ ] Comment bodies are NEVER passed to LLM in automated/pulse context
 - [ ] `prompt-guard-helper.sh scan` is called before any LLM processes external comment content in interactive sessions
 - [ ] `contribution-watch-helper.sh install` creates launchd plist `sh.aidevops.contribution-watch`
+- [ ] Terminal greeting shows contribution count when items need attention
+- [ ] macOS notification fires on new items detected during launchd scan
 - [ ] ShellCheck passes on all new scripts
 - [ ] Lint clean
 
