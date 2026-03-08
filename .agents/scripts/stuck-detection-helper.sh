@@ -147,7 +147,7 @@ _sd_write_state() {
 
 	# Atomic write via temp file + mv
 	local tmp_file="${state_file}.tmp.$$"
-	if ! printf '%s\n' "$state_json" >"$tmp_file" 2>/dev/null; then
+	if ! printf '%s\n' "$state_json" >"$tmp_file"; then
 		_sd_log_warn "failed to write temp state file: $tmp_file"
 		rm -f "$tmp_file" 2>/dev/null || true
 		return 1
@@ -268,7 +268,7 @@ cmd_label_stuck() {
 
 	# Check confidence threshold
 	local above_threshold
-	above_threshold=$(awk "BEGIN { print ($confidence >= $STUCK_CONFIDENCE_THRESHOLD) ? 1 : 0 }" 2>/dev/null) || above_threshold="0"
+	above_threshold=$(awk -v c="$confidence" -v t="$STUCK_CONFIDENCE_THRESHOLD" 'BEGIN { print (c >= t) ? 1 : 0 }') || above_threshold="0"
 
 	if [[ "$above_threshold" -ne 1 ]]; then
 		_sd_log_info "confidence $confidence below threshold $STUCK_CONFIDENCE_THRESHOLD for issue #$issue_number — not labeling"
@@ -307,7 +307,7 @@ cmd_label_stuck() {
 
 	# Apply label
 	gh issue edit "$issue_number" --repo "$repo_slug" \
-		--add-label "$STUCK_LABEL" 2>/dev/null || {
+		--add-label "$STUCK_LABEL" || {
 		_sd_log_warn "failed to add label to issue #$issue_number"
 		return 1
 	}
@@ -331,7 +331,7 @@ ${suggested_actions}
 *This is an advisory notification only. No automated action has been taken. The worker continues running. The \`${STUCK_LABEL}\` label will be automatically removed if the task completes successfully.*"
 
 	gh issue comment "$issue_number" --repo "$repo_slug" \
-		--body "$comment_body" 2>/dev/null || {
+		--body "$comment_body" || {
 		_sd_log_warn "failed to comment on issue #$issue_number"
 	}
 
@@ -343,6 +343,7 @@ ${suggested_actions}
 	local new_state
 	new_state=$(printf '%s' "$state" | jq \
 		--arg issue "$issue_number" \
+		--arg repo "$repo_slug" \
 		--arg repo "$repo_slug" \
 		--arg now "$now" \
 		'.labeled_issues = ((.labeled_issues // []) + [{"issue": $issue, "repo": $repo, "labeled_at": $now}] | unique_by(.issue + .repo))') || true
@@ -394,7 +395,7 @@ cmd_label_clear() {
 
 	# Remove the label
 	gh issue edit "$issue_number" --repo "$repo_slug" \
-		--remove-label "$STUCK_LABEL" 2>/dev/null || {
+		--remove-label "$STUCK_LABEL" || {
 		_sd_log_warn "failed to remove label from issue #$issue_number"
 		return 1
 	}
@@ -416,7 +417,8 @@ cmd_label_clear() {
 	new_state=$(printf '%s' "$state" | jq \
 		--arg key "$issue_key" \
 		--arg issue "$issue_number" \
-		'del(.milestones_checked[$key]) | .labeled_issues = [.labeled_issues[] | select(.issue != $issue)]') || true
+		--arg repo "$repo_slug" \
+		'del(.milestones_checked[$key]) | .labeled_issues = [.labeled_issues[] | select(not (.issue == $issue and .repo == $repo))]') || true
 	if [[ -n "$new_state" ]]; then
 		_sd_write_state "$new_state" || true
 	fi
