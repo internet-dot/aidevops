@@ -386,15 +386,20 @@ _rs_log_scan() {
 			'{timestamp: $ts, content_type: $type, source: $source, result: $result, finding_count: $findings, max_severity: $severity, byte_count: $bytes, scan_duration_ms: $duration, risk_level: $risk, policy: $policy, worker_id: $worker, session_id: $session}' \
 			>>"$log_file" || true
 	else
-		# Fallback without jq — escape untrusted values to prevent JSON injection
-		local safe_source safe_worker safe_session
+		# Fallback without jq — escape ALL interpolated values to prevent JSON injection
+		local safe_type safe_source safe_result safe_severity safe_risk safe_policy safe_worker safe_session
+		safe_type=$(_rs_json_escape "$content_type")
 		safe_source=$(_rs_json_escape "$log_source")
+		safe_result=$(_rs_json_escape "$result")
+		safe_severity=$(_rs_json_escape "$max_severity")
+		safe_risk=$(_rs_json_escape "$risk_level")
+		safe_policy=$(_rs_json_escape "$policy")
 		safe_worker=$(_rs_json_escape "$RUNTIME_SCAN_WORKER_ID")
 		safe_session=$(_rs_json_escape "$RUNTIME_SCAN_SESSION_ID")
 		printf '{"timestamp":"%s","content_type":"%s","source":"%s","result":"%s","finding_count":%d,"max_severity":"%s","byte_count":%d,"scan_duration_ms":%d,"risk_level":"%s","policy":"%s","worker_id":"%s","session_id":"%s"}\n' \
-			"$timestamp" "$content_type" "$safe_source" "$result" \
-			"$finding_count" "$max_severity" "$byte_count" "$scan_duration_ms" \
-			"$risk_level" "$policy" "$safe_worker" "$safe_session" \
+			"$timestamp" "$safe_type" "$safe_source" "$safe_result" \
+			"$finding_count" "$safe_severity" "$byte_count" "$scan_duration_ms" \
+			"$safe_risk" "$safe_policy" "$safe_worker" "$safe_session" \
 			>>"$log_file" || true
 	fi
 
@@ -600,12 +605,14 @@ cmd_scan() {
 		if command -v jq &>/dev/null && [[ -n "$scan_output" ]]; then
 			printf '%s' "$scan_output" | jq -c --arg policy "$policy" '. + {policy: $policy}'
 		else
-			# Escape untrusted values to prevent JSON injection
-			local safe_source safe_type
+			# Escape ALL interpolated values to prevent JSON injection
+			local safe_source safe_type safe_severity safe_policy
 			safe_source=$(_rs_json_escape "$source")
 			safe_type=$(_rs_json_escape "$content_type")
+			safe_severity=$(_rs_json_escape "$max_severity")
+			safe_policy=$(_rs_json_escape "$policy")
 			printf '{"result":"findings","content_type":"%s","source":"%s","finding_count":%d,"max_severity":"%s","policy":"%s"}\n' \
-				"$safe_type" "$safe_source" "$finding_count" "$max_severity" "$policy"
+				"$safe_type" "$safe_source" "$finding_count" "$safe_severity" "$safe_policy"
 		fi
 
 		return 1
