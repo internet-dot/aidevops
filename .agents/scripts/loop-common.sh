@@ -193,7 +193,7 @@ loop_set_state() {
 	trap '_run_cleanups' RETURN
 	push_cleanup "rm -f '${temp_file}'"
 
-	# Determine value type and update
+	# Determine value type and update (use --arg for strings to prevent jq injection)
 	if [[ "$value" =~ ^[0-9]+$ ]]; then
 		# Integer
 		jq "$key = $value" "$LOOP_STATE_FILE" >"$temp_file"
@@ -204,8 +204,8 @@ loop_set_state() {
 		# Null
 		jq "$key = null" "$LOOP_STATE_FILE" >"$temp_file"
 	else
-		# String
-		jq "$key = \"$value\"" "$LOOP_STATE_FILE" >"$temp_file"
+		# String — use --arg to safely escape quotes/backslashes/newlines
+		jq --arg v "$value" "$key = \$v" "$LOOP_STATE_FILE" >"$temp_file"
 	fi
 
 	mv "$temp_file" "$LOOP_STATE_FILE"
@@ -676,12 +676,12 @@ loop_track_attempt() {
 	local task_id="${1:-$(loop_get_state ".task_id")}"
 
 	local attempts
-	attempts=$(jq -r ".attempts[\"$task_id\"] // 0" "$LOOP_STATE_FILE" 2>/dev/null || echo "0")
+	attempts=$(jq -r --arg tid "$task_id" '.attempts[$tid] // 0' "$LOOP_STATE_FILE" 2>/dev/null || echo "0")
 	local new_attempts=$((attempts + 1))
 
 	local temp_file
 	temp_file=$(mktemp)
-	jq ".attempts[\"$task_id\"] = $new_attempts" "$LOOP_STATE_FILE" >"$temp_file"
+	jq --arg tid "$task_id" --argjson val "$new_attempts" '.attempts[$tid] = $val' "$LOOP_STATE_FILE" >"$temp_file"
 	mv "$temp_file" "$LOOP_STATE_FILE"
 
 	echo "$new_attempts"
@@ -722,9 +722,12 @@ loop_block_task() {
 	local reason="$1"
 	local task_id="${2:-$(loop_get_state ".task_id")}"
 
-	local temp_file
+	local temp_file blocked_at
 	temp_file=$(mktemp)
-	jq ".blocked_tasks += [{\"id\": \"$task_id\", \"reason\": \"$reason\", \"blocked_at\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}]" "$LOOP_STATE_FILE" >"$temp_file"
+	blocked_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+	jq --arg id "$task_id" --arg reason "$reason" --arg blocked_at "$blocked_at" \
+		'.blocked_tasks += [{"id": $id, "reason": $reason, "blocked_at": $blocked_at}]' \
+		"$LOOP_STATE_FILE" >"$temp_file"
 	mv "$temp_file" "$LOOP_STATE_FILE"
 
 	loop_store_failure "Task blocked after multiple attempts" "$reason"
