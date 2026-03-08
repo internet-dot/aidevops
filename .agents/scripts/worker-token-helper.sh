@@ -443,12 +443,17 @@ cmd_validate() {
 	fi
 
 	# Validate token file path is within TOKEN_DIR to prevent path traversal
-	local real_path
+	# Canonicalize TOKEN_DIR to handle symlinks (consistent with cmd_revoke)
+	local real_path token_dir_real
+	token_dir_real=$(realpath "$TOKEN_DIR" 2>/dev/null) || {
+		log_token "ERROR" "Cannot resolve token directory: ${TOKEN_DIR}"
+		return 1
+	}
 	real_path=$(realpath "$token_file" 2>/dev/null) || {
 		log_token "ERROR" "Cannot resolve token file path: ${token_file}"
 		return 1
 	}
-	if [[ "$real_path" != "${TOKEN_DIR}/"* ]]; then
+	if [[ "$real_path" != "${token_dir_real}/"* ]]; then
 		log_token "ERROR" "Token file must be within ${TOKEN_DIR}: ${token_file}"
 		return 1
 	fi

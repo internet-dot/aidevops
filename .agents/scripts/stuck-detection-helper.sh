@@ -267,7 +267,14 @@ cmd_label_stuck() {
 	fi
 
 	# Check confidence threshold
+	# Validate confidence and threshold are numeric to prevent string comparison
+	# semantics in awk (e.g., "high" >= "0.7" is true lexicographically)
 	local above_threshold
+	if ! [[ "$confidence" =~ ^([0-9]+([.][0-9]+)?|[.][0-9]+)$ ]] ||
+		! [[ "$STUCK_CONFIDENCE_THRESHOLD" =~ ^([0-9]+([.][0-9]+)?|[.][0-9]+)$ ]]; then
+		_sd_log_error "confidence values must be numeric (got confidence=${confidence}, threshold=${STUCK_CONFIDENCE_THRESHOLD})"
+		return 1
+	fi
 	above_threshold=$(awk -v c="$confidence" -v t="$STUCK_CONFIDENCE_THRESHOLD" 'BEGIN { print (c >= t) ? 1 : 0 }') || above_threshold="0"
 
 	if [[ "$above_threshold" -ne 1 ]]; then
