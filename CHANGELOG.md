@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.167.0] - 2026-03-09
+
+### Added
+
+- auto-create profile README for new users on setup (#3954)
+- add cache savings column to AI model usage table (#3953)
+
 ## [2.166.0] - 2026-03-09
 
 ### Added
