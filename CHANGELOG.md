@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- address Gemini code review feedback on profile README generation (#3963)
+  - parallel fork parent URL fetch (xargs -P 6) replacing sequential N+1 API calls
+  - consolidate jq calls for user profile and own repos into single passes
+  - add input sanitization (_sanitize_md, _sanitize_url) to prevent markdown injection
+  - strip tabs/newlines from user-controlled fields to prevent delimiter injection
+
 ## [2.168.0] - 2026-03-09
 
 ### Added
