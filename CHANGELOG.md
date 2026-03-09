@@ -7,13 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.168.1] - 2026-03-09
+
+### Added
+
+- add contribution-watch to monitor external issues/PRs for new comments (#3933) (#3943)
+
+### Changed
+
+- Documentation: add changelog entry for profile README review fixes
+
 ### Fixed
 
 - address Gemini code review feedback on profile README generation (#3963)
-  - parallel fork parent URL fetch (xargs -P 6) replacing sequential N+1 API calls
-  - consolidate jq calls for user profile and own repos into single passes
-  - add input sanitization (_sanitize_md, _sanitize_url) to prevent markdown injection
-  - strip tabs/newlines from user-controlled fields to prevent delimiter injection
+- move SONAR_TOKEN to job-level env so if: conditions evaluate correctly (#3958)
 
 ## [2.168.0] - 2026-03-09
 
