@@ -276,7 +276,6 @@ portless run next dev
 ```typescript
 const config: NextConfig = {
   allowedDevOrigins: [
-    "myapp.localhost",
     "myapp.localhost:1355",
   ],
 };
