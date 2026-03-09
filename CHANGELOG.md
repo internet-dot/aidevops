@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.167.1] - 2026-03-09
+
+### Fixed
+
+- improve worker session classification to reduce inflated interactive counts (#3957)
+- security hardening — path traversal, injection, jq filter bug (batch 3) (#3877)
+- HIGH quality-debt batch — logic bugs, exit codes, path typo, arg guards (#3947)
+
 ## [2.167.0] - 2026-03-09
 
 ### Added
