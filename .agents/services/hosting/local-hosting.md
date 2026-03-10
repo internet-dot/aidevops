@@ -251,11 +251,11 @@ Create separate databases per feature branch to avoid schema conflicts:
 
 ```bash
 # Create branch database
-localdev db create myapp-feature-auth
+localdev-helper.sh db create myapp-feature-auth
 # -> postgresql://postgres:localdev@localhost:5432/myapp_feature_auth
 
 # When branch is merged, clean up
-localdev db drop myapp-feature-auth --force
+localdev-helper.sh db drop myapp-feature-auth --force
 ```
 
 
@@ -405,9 +405,9 @@ localdev-helper.sh db start
 |-------|----------|----------|
 | `.local` TLD conflicts with macOS mDNS | Requires `/etc/hosts` hacks per app | `.localhost` resolves natively (RFC 6761) |
 | Setup complexity | `sudo`, dnsmasq, resolver, Traefik, Docker | `npm install -g portless` |
-| Worktree support | Manual `localdev branch` per worktree | Auto-detected, zero config |
-| Agent integration | None | `PORTLESS_URL` env var |
-| Framework auto-config | None — manual port assignment | Auto-injects `--port`/`--host` flags |
+| Worktree support | `localdev-helper.sh run` auto-detects worktrees, creates branch routes | Auto-detected, zero config |
+| Agent integration | `localdev-helper.sh run` injects PORT/HOST, auto-registers services | `PORTLESS_URL` env var |
+| Framework auto-config | `localdev-helper.sh run` injects PORT/HOST env vars into frameworks | Auto-injects `--port`/`--host` flags |
 
 ### When to still use localdev
 
