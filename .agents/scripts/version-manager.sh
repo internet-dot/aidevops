@@ -327,6 +327,13 @@ EOF
 
 # Function to run preflight quality checks
 run_preflight_checks() {
+	local bump_type="${1:-}"
+
+	if [[ "$bump_type" == "patch" ]]; then
+		run_patch_release_preflight
+		return $?
+	fi
+
 	print_info "Running preflight quality checks..."
 
 	local preflight_script="$REPO_ROOT/.agents/scripts/linters-local.sh"
@@ -343,6 +350,170 @@ run_preflight_checks() {
 		print_warning "Preflight script not found, skipping checks"
 		return 0
 	fi
+}
+
+SECRETLINT_CMD=()
+PATCH_PREFLIGHT_TMP_DIR=""
+
+configure_secretlint_command() {
+	SECRETLINT_CMD=()
+
+	if command -v secretlint &>/dev/null; then
+		SECRETLINT_CMD=(secretlint)
+		return 0
+	fi
+
+	if [[ -x "$REPO_ROOT/node_modules/.bin/secretlint" ]]; then
+		SECRETLINT_CMD=("$REPO_ROOT/node_modules/.bin/secretlint")
+		return 0
+	fi
+
+	if [[ -f "$REPO_ROOT/package.json" ]]; then
+		SECRETLINT_CMD=(npx -y -p secretlint -p @secretlint/secretlint-rule-preset-recommend secretlint)
+		return 0
+	fi
+
+	print_error "Secretlint is required for patch release preflight"
+	print_info "Install dependencies or make secretlint available before releasing"
+	return 1
+}
+
+normalize_secretlint_output() {
+	local scan_root="$1"
+	local line=""
+
+	while IFS= read -r line; do
+		[[ -n "$line" ]] || continue
+		line="${line#"$scan_root"/}"
+		line="${line#"$scan_root"}"
+		line=$(printf '%s\n' "$line" | sed -E 's/: line [0-9]+, col [0-9]+, /: /')
+		printf '%s\n' "$line"
+	done | sort -u
+	return 0
+}
+
+capture_secretlint_findings() {
+	local scan_root="$1"
+	local output_file="$2"
+	local canonical_scan_root=""
+	local raw_output=""
+
+	canonical_scan_root=$(cd "$scan_root" && pwd -P)
+
+	raw_output=$(
+		cd "$canonical_scan_root" || exit 1
+		"${SECRETLINT_CMD[@]}" "**/*" --format compact 2>&1
+	) || true
+
+	if [[ "$raw_output" == *"AggregationError"* ]] || [[ "$raw_output" == *"Failed to load rule module"* ]]; then
+		print_error "Secretlint failed to load its configured rules"
+		return 1
+	fi
+
+	if [[ -z "$raw_output" ]]; then
+		: >"$output_file"
+		return 0
+	fi
+
+	printf '%s\n' "$raw_output" | normalize_secretlint_output "$canonical_scan_root" >"$output_file"
+	return 0
+}
+
+cleanup_temp_dir() {
+	local target_dir="$1"
+
+	[[ -n "$target_dir" ]] || return 0
+	rm -rf "$target_dir"
+	return 0
+}
+
+run_patch_release_preflight() {
+	local baseline_ref=""
+	baseline_ref=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+	if [[ -z "$baseline_ref" ]]; then
+		print_warning "No previous tag found; falling back to full preflight"
+		local preflight_script="$REPO_ROOT/.agents/scripts/linters-local.sh"
+		if [[ -f "$preflight_script" ]]; then
+			bash "$preflight_script"
+			return $?
+		fi
+		print_warning "Preflight script not found, skipping checks"
+		return 0
+	fi
+
+	print_info "Running patch release regression preflight against $baseline_ref..."
+
+	local changed_files=""
+	changed_files=$(git diff --name-only "$baseline_ref"..HEAD 2>/dev/null || echo "")
+
+	if ! configure_secretlint_command; then
+		return 1
+	fi
+
+	local tmp_dir=""
+	tmp_dir=$(mktemp -d)
+	PATCH_PREFLIGHT_TMP_DIR="$tmp_dir"
+	local baseline_dir="$tmp_dir/baseline"
+	local current_findings="$tmp_dir/current.secretlint"
+	local baseline_findings="$tmp_dir/baseline.secretlint"
+	local new_findings="$tmp_dir/new.secretlint"
+	trap 'cleanup_temp_dir "$PATCH_PREFLIGHT_TMP_DIR"; PATCH_PREFLIGHT_TMP_DIR=""' RETURN
+	mkdir -p "$baseline_dir"
+
+	if ! git archive "$baseline_ref" | tar -x -C "$baseline_dir"; then
+		print_error "Failed to prepare baseline snapshot for $baseline_ref"
+		return 1
+	fi
+
+	if ! capture_secretlint_findings "$REPO_ROOT" "$current_findings"; then
+		return 1
+	fi
+
+	if ! capture_secretlint_findings "$baseline_dir" "$baseline_findings"; then
+		return 1
+	fi
+
+	comm -13 "$baseline_findings" "$current_findings" >"$new_findings" || true
+	if [[ -s "$new_findings" ]]; then
+		print_error "Secretlint: new findings introduced since $baseline_ref"
+		read -r first_new <"$new_findings" || true
+		if [[ -n "$first_new" ]]; then
+			echo "$first_new"
+		fi
+		return 1
+	fi
+	print_success "Secretlint: no new findings since $baseline_ref"
+
+	local -a changed_shell_files=()
+	local changed_file=""
+	while IFS= read -r changed_file; do
+		[[ -n "$changed_file" ]] || continue
+		case "$changed_file" in
+		*.sh)
+			changed_shell_files+=("$changed_file")
+			;;
+		esac
+	done <<<"$changed_files"
+
+	if [[ ${#changed_shell_files[@]} -gt 0 ]]; then
+		if ! command -v shellcheck &>/dev/null; then
+			print_warning "shellcheck not installed (install: brew install shellcheck)"
+		else
+			print_info "Running ShellCheck on files changed since $baseline_ref..."
+			if shellcheck --severity=warning "${changed_shell_files[@]}"; then
+				print_success "ShellCheck: changed shell files passed"
+			else
+				print_error "ShellCheck failed on files changed since $baseline_ref"
+				return 1
+			fi
+		fi
+	else
+		print_info "ShellCheck: no shell files changed since $baseline_ref"
+	fi
+
+	print_success "Patch release regression preflight passed"
+	return 0
 }
 
 # Function to validate version consistency across files
@@ -1026,7 +1197,7 @@ main() {
 
 		# Run preflight checks unless skipped
 		if [[ "$skip_preflight" != "--skip-preflight" ]]; then
-			if ! run_preflight_checks; then
+			if ! run_preflight_checks "$bump_type"; then
 				print_error "Preflight checks failed. Fix issues or use --skip-preflight to bypass."
 				exit 1
 			fi
@@ -1103,6 +1274,13 @@ main() {
 		version=$(get_current_version)
 		validate_version_consistency "$version"
 		;;
+	"preflight")
+		if [[ -z "$bump_type" ]]; then
+			print_error "Bump type required. Usage: $0 preflight [major|minor|patch]"
+			exit 1
+		fi
+		run_preflight_checks "$bump_type"
+		;;
 	"changelog-check")
 		local version
 		version=$(get_current_version)
@@ -1139,6 +1317,7 @@ main() {
 		echo "  tag                           Create git tag for current version"
 		echo "  github-release                Create GitHub release for current version"
 		echo "  release [major|minor|patch]   Bump version, update files, create tag and GitHub release"
+		echo "  preflight [major|minor|patch] Run release preflight checks only"
 		echo "  validate                      Validate version consistency across all files"
 		echo "  changelog-check               Check CHANGELOG.md has entry for current version"
 		echo "  changelog-preview             Generate changelog entry from commits since last tag"
