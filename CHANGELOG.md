@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- document pulse backlog fallback for high-priority unlabeled issues
+
+### Fixed
+
+- reduce pulse idle cycles caused by over-reliance on `auto-dispatch` / `status:available` labels
+
 ## [2.171.6] - 2026-03-11
 
 ### Changed
