@@ -1085,6 +1085,20 @@ cmd_check() {
 		return 1
 	fi
 
+	# Clean up any working tree changes left by setup.sh or other processes
+	# (e.g., chmod on tracked scripts, scan results written to repo)
+	# This ensures git pull --ff-only won't be blocked by dirty files.
+	# See: https://github.com/marcusquinn/aidevops/issues/2286
+	if ! git -C "$INSTALL_DIR" diff --quiet 2>/dev/null || ! git -C "$INSTALL_DIR" diff --cached --quiet 2>/dev/null; then
+		log_info "Cleaning up stale working tree changes..."
+		if ! git -C "$INSTALL_DIR" reset HEAD -- . 2>>"$LOG_FILE"; then
+			log_warn "git reset HEAD failed during working tree cleanup"
+		fi
+		if ! git -C "$INSTALL_DIR" checkout -- . 2>>"$LOG_FILE"; then
+			log_warn "git checkout -- . failed during working tree cleanup"
+		fi
+	fi
+
 	# Ensure we're on the main branch (detached HEAD or stale branch blocks pull)
 	# Mirrors recovery logic from aidevops.sh cmd_update()
 	# See: https://github.com/marcusquinn/aidevops/issues/4142
@@ -1098,20 +1112,6 @@ cmd_check() {
 			update_state "update" "$remote" "branch_switch_failed"
 			run_freshness_checks
 			return 1
-		fi
-	fi
-
-	# Clean up any working tree changes left by setup.sh or other processes
-	# (e.g., chmod on tracked scripts, scan results written to repo)
-	# This ensures git pull --ff-only won't be blocked by dirty files.
-	# See: https://github.com/marcusquinn/aidevops/issues/2286
-	if ! git -C "$INSTALL_DIR" diff --quiet 2>/dev/null || ! git -C "$INSTALL_DIR" diff --cached --quiet 2>/dev/null; then
-		log_info "Cleaning up stale working tree changes..."
-		if ! git -C "$INSTALL_DIR" reset HEAD -- . 2>>"$LOG_FILE"; then
-			log_warn "git reset HEAD failed during working tree cleanup"
-		fi
-		if ! git -C "$INSTALL_DIR" checkout -- . 2>>"$LOG_FILE"; then
-			log_warn "git checkout -- . failed during working tree cleanup"
 		fi
 	fi
 
