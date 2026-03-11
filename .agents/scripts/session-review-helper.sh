@@ -394,9 +394,9 @@ _security_session_context() {
 	# session-security-helper.sh exists — query it
 	local score
 	if [[ -n "$session_filter" ]]; then
-		score=$("$session_helper" score --session "$session_filter" 2>/dev/null) || score=""
+		score=$("$session_helper" score --session-id "$session_filter" 2>/dev/null || echo "")
 	else
-		score=$("$session_helper" score 2>/dev/null) || score=""
+		score=$("$session_helper" score 2>/dev/null || echo "")
 	fi
 	if [[ -n "$score" ]]; then
 		echo "  Composite score: $score"
@@ -682,15 +682,11 @@ _security_summary_json() {
 	if [[ -x "$session_helper" ]]; then
 		local context_result
 		if [[ -n "$session_filter" ]]; then
-			context_result=$("$session_helper" get-context --session-id "$session_filter" 2>/dev/null) || context_result=""
+			context_result=$("$session_helper" get-context --session-id "$session_filter" 2>/dev/null || echo "")
 		else
-			context_result=$("$session_helper" get-context 2>/dev/null) || context_result=""
+			context_result=$("$session_helper" get-context 2>/dev/null || echo "")
 		fi
-		if [[ -n "$context_result" ]]; then
-			session_context_json=$(printf '%s' "$context_result" | jq -c --argjson available true '. + {available: $available}' 2>/dev/null) || session_context_json='{"available":true}'
-		else
-			session_context_json='{"available":true}'
-		fi
+		session_context_json=$(printf '%s' "$context_result" | jq -c --argjson available true '. + {available: $available}' 2>/dev/null || echo '{"available":true}')
 	fi
 
 	# Quarantine — query helper if available
