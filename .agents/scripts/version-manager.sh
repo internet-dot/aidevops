@@ -382,6 +382,16 @@ secretlint_runtime_works() {
 	return 0
 }
 
+secretlint_output_has_runtime_error() {
+	local output_file="$1"
+
+	if grep -Eq 'AggregationError|Failed to load rule module|Cannot find module|Cannot create a string longer than|at async file://' "$output_file"; then
+		return 0
+	fi
+
+	return 1
+}
+
 configure_secretlint_command() {
 	SECRETLINT_CMD=()
 	local -a candidate_cmd=()
@@ -433,35 +443,44 @@ capture_secretlint_findings() {
 	local scan_root="$1"
 	local output_file="$2"
 	local canonical_scan_root=""
-	local raw_output=""
+	local raw_output_file=""
 	local secretlint_exit=0
 
 	canonical_scan_root=$(cd "$scan_root" && pwd -P)
+	raw_output_file=$(mktemp "$PATCH_PREFLIGHT_TMP_DIR/secretlint-output.XXXXXX")
+	if [[ -z "$raw_output_file" ]]; then
+		print_error "Failed to allocate temporary file for secretlint output"
+		return 1
+	fi
 
-	raw_output=$(
+	(
 		cd "$canonical_scan_root" || exit 1
-		"${SECRETLINT_CMD[@]}" "**/*" --format compact 2>&1
+		"${SECRETLINT_CMD[@]}" "**/*" --format compact >"$raw_output_file" 2>&1
 	)
 	secretlint_exit=$?
 
-	if [[ "$raw_output" == *"AggregationError"* ]] || [[ "$raw_output" == *"Failed to load rule module"* ]] || [[ "$raw_output" == *"at async file://"* ]]; then
-		print_error "Secretlint failed to load its configured rules"
+	if secretlint_output_has_runtime_error "$raw_output_file"; then
+		print_error "Secretlint execution failed due to runtime error"
+		rm -f "$raw_output_file"
 		return 1
 	fi
 
 	if [[ $secretlint_exit -ne 0 ]]; then
-		if ! printf '%s\n' "$raw_output" | grep -Eq ': line [0-9]+, col [0-9]+, '; then
+		if ! grep -Eq ': line [0-9]+, col [0-9]+, ' "$raw_output_file"; then
 			print_error "Secretlint execution failed with non-finding output"
+			rm -f "$raw_output_file"
 			return 1
 		fi
 	fi
 
-	if [[ -z "$raw_output" ]]; then
+	if [[ ! -s "$raw_output_file" ]]; then
 		: >"$output_file"
+		rm -f "$raw_output_file"
 		return 0
 	fi
 
-	printf '%s\n' "$raw_output" | normalize_secretlint_output "$canonical_scan_root" >"$output_file"
+	normalize_secretlint_output "$canonical_scan_root" <"$raw_output_file" >"$output_file"
+	rm -f "$raw_output_file"
 	return 0
 }
 
