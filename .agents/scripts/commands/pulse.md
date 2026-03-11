@@ -541,15 +541,20 @@ For each dispatchable issue:
 RUNNER_USER=$(gh api user --jq '.login' 2>/dev/null || whoami)
 gh issue edit <number> --repo <slug> --add-assignee "$RUNNER_USER" --add-label "status:queued" --remove-label "status:available" 2>/dev/null || true
 
-opencode run --dir <path> --title "Issue #<number>: <title>" \
-  "/full-loop Implement issue #<number> (<url>) -- <brief description>" &
+~/.aidevops/agents/scripts/headless-runtime-helper.sh run \
+  --role worker \
+  --session-key "issue-<number>" \
+  --dir <path> \
+  --title "Issue #<number>: <title>" \
+  --prompt "/full-loop Implement issue #<number> (<url>) -- <brief description>" &
 sleep 2
 ```
 
 **Dispatch rules:**
-- ALWAYS use `opencode run` — NEVER `claude` or `claude -p`
+- ALWAYS use `~/.aidevops/agents/scripts/headless-runtime-helper.sh run` for headless dispatches — NEVER `claude`, `claude -p`, or raw `opencode run`
 - Background with `&`, sleep 2 between dispatches
-- Do NOT add `--model` for first attempts — let `/full-loop` use its default. Bundle presets (t1364.6) handle per-project model defaults automatically. **Exception:** when escalating after 2+ failed attempts on the same issue, add `--model anthropic/claude-opus-4-6` (see "Model escalation after repeated failures" above).
+- The helper alternates the default headless providers/models (`anthropic/claude-sonnet-4-6`, `openai/gpt-5.3-codex`), persists session IDs per provider + session key, honors provider backoff, and rejects `opencode/*` gateway models (no Zen fallback for headless runs)
+- Do NOT add `--model` for first attempts — let the helper choose the alternating default. **Exception:** when escalating after 2+ failed attempts on the same issue, pass `--model anthropic/claude-opus-4-6` to the helper (see "Model escalation after repeated failures" above).
 - Use `--dir <path>` from repos.json
 - Route non-code tasks with `--agent`: SEO, Content, Marketing, Business, Research (see AGENTS.md "Agent Routing")
 - **Bundle-aware agent routing (t1364.6):** Before dispatching, check if the target repo has a bundle with `agent_routing` overrides. Run `bundle-helper.sh get agent_routing <repo-path>` — if the task domain (code, seo, content, marketing) has a non-default agent, use `--agent <name>`. Example: a content-site bundle routes `marketing` tasks to the Marketing agent instead of Build+. Explicit `--agent` flags in the issue body always override bundle defaults.
@@ -567,8 +572,12 @@ sleep 2
   # Build lineage block (see headless-dispatch.md for full assembly)
   # Or use: LINEAGE_BLOCK=$(task-decompose-helper.sh format-lineage "$TASK_ID")
 
-  opencode run --dir <path> --title "Issue #<number>: <title>" \
-    "/full-loop Implement issue #<number> (<url>) -- <brief description>
+  ~/.aidevops/agents/scripts/headless-runtime-helper.sh run \
+    --role worker \
+    --session-key "issue-<number>" \
+    --dir <path> \
+    --title "Issue #<number>: <title>" \
+    --prompt "/full-loop Implement issue #<number> (<url>) -- <brief description>
 
   TASK LINEAGE:
     0. [parent] ${PARENT_DESC} (${PARENT_ID})
@@ -615,8 +624,12 @@ NEXT_BATCH=$(batch-strategy-helper.sh next-batch \
 echo "$NEXT_BATCH" | jq -r '.[]' | while read -r task_id; do
   # Look up the issue number and repo for this task_id
   # Then dispatch as normal (see dispatch rules above)
-  opencode run --dir <path> --title "Issue #<number>: <title>" \
-    "/full-loop Implement issue #<number> (<url>) -- <brief description>" &
+  ~/.aidevops/agents/scripts/headless-runtime-helper.sh run \
+    --role worker \
+    --session-key "task-${task_id}" \
+    --dir <path> \
+    --title "Issue #<number>: <title>" \
+    --prompt "/full-loop Implement issue #<number> (<url>) -- <brief description>" &
   sleep 2
 done
 ```
@@ -894,15 +907,23 @@ For each feature in the current milestone with status `pending`:
 
 ```bash
 # Full mode — standard worktree + PR workflow
-opencode run --dir <repo_path> --title "Mission <mission_id> - <feature_title>" \
-  "/full-loop Implement <task_id> -- <feature_description>. Mission context: <mission_goal>. Milestone: <milestone_name>." &
+~/.aidevops/agents/scripts/headless-runtime-helper.sh run \
+  --role worker \
+  --session-key "mission-<mission_id>-<task_id>" \
+  --dir <repo_path> \
+  --title "Mission <mission_id> - <feature_title>" \
+  --prompt "/full-loop Implement <task_id> -- <feature_description>. Mission context: <mission_goal>. Milestone: <milestone_name>." &
 sleep 2
 ```
 
 ```bash
 # POC mode — commit directly, skip ceremony
-opencode run --dir <repo_path> --title "Mission <mission_id> - <feature_title>" \
-  "/full-loop --poc <feature_description>. Mission context: <mission_goal>." &
+~/.aidevops/agents/scripts/headless-runtime-helper.sh run \
+  --role worker \
+  --session-key "mission-<mission_id>-<feature_title>" \
+  --dir <repo_path> \
+  --title "Mission <mission_id> - <feature_title>" \
+  --prompt "/full-loop --poc <feature_description>. Mission context: <mission_goal>." &
 sleep 2
 ```
 
@@ -910,8 +931,12 @@ sleep 2
 
   ```bash
   # Mission dispatch with lineage — milestone as parent, features as siblings
-  opencode run --dir <repo_path> --title "Mission <mission_id> - <feature_title>" \
-    "/full-loop Implement <task_id> -- <feature_description>. Mission context: <mission_goal>.
+  ~/.aidevops/agents/scripts/headless-runtime-helper.sh run \
+    --role worker \
+    --session-key "mission-<mission_id>-<task_id>" \
+    --dir <repo_path> \
+    --title "Mission <mission_id> - <feature_title>" \
+    --prompt "/full-loop Implement <task_id> -- <feature_description>. Mission context: <mission_goal>.
 
   TASK LINEAGE:
     0. [milestone] <milestone_name>: <milestone_description> (mission:<mission_id>)
@@ -940,8 +965,12 @@ If ALL features in the current milestone have status `completed` (merged PRs exi
 - Dispatch a validation worker using the milestone's validation criteria:
 
 ```bash
-opencode run --dir <repo_path> --title "Mission <mission_id> - Validate Milestone <N>" \
-  "/full-loop Validate milestone <N> of mission <mission_id>. Validation criteria: <criteria>. Run tests, check build, verify integration. Update mission state file at <path> with pass/fail result." &
+~/.aidevops/agents/scripts/headless-runtime-helper.sh run \
+  --role worker \
+  --session-key "mission-<mission_id>-validate-<N>" \
+  --dir <repo_path> \
+  --title "Mission <mission_id> - Validate Milestone <N>" \
+  --prompt "/full-loop Validate milestone <N> of mission <mission_id>. Validation criteria: <criteria>. Run tests, check build, verify integration. Update mission state file at <path> with pass/fail result." &
 sleep 2
 ```
 

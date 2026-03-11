@@ -12,6 +12,7 @@
 #   5. Internal watchdog kills stuck pulses after PULSE_STALE_THRESHOLD (t1397)
 #   6. Self-watchdog: idle detection kills pulse when CPU drops to zero (t1398.3)
 #   7. Progress-based watchdog: kills if log output stalls for PULSE_PROGRESS_TIMEOUT (GH#2958)
+#   8. Provider-aware pulse sessions via headless-runtime-helper.sh
 #
 # Lifecycle: launchd fires every 120s. If a pulse is still running, the
 # dedup check skips. run_pulse() has an internal watchdog that polls every
@@ -96,7 +97,8 @@ SESSION_FLAG="${HOME}/.aidevops/logs/pulse-session.flag"
 STOP_FLAG="${HOME}/.aidevops/logs/pulse-session.stop"
 OPENCODE_BIN="${OPENCODE_BIN:-$(command -v opencode 2>/dev/null || echo "opencode")}"
 PULSE_DIR="${PULSE_DIR:-${HOME}/Git/aidevops}"
-PULSE_MODEL="${PULSE_MODEL:-anthropic/claude-sonnet-4-6}"
+PULSE_MODEL="${PULSE_MODEL:-}"
+HEADLESS_RUNTIME_HELPER="${HEADLESS_RUNTIME_HELPER:-${SCRIPT_DIR}/headless-runtime-helper.sh}"
 REPOS_JSON="${REPOS_JSON:-${HOME}/.config/aidevops/repos.json}"
 STATE_FILE="${HOME}/.aidevops/logs/pulse-state.txt"
 
@@ -1260,12 +1262,14 @@ ${state_content}
 --- END PRE-FETCHED STATE ---"
 	fi
 
-	# Run opencode in background
-	"$OPENCODE_BIN" run "$prompt" \
-		--dir "$PULSE_DIR" \
-		-m "$PULSE_MODEL" \
-		--title "Supervisor Pulse" \
-		>>"$LOGFILE" 2>&1 &
+	# Run the provider-aware headless wrapper in background.
+	# It alternates direct Anthropic/OpenAI models, persists pulse sessions per
+	# provider, and avoids opencode/* gateway models for headless runs.
+	local -a pulse_cmd=("$HEADLESS_RUNTIME_HELPER" run --role pulse --session-key supervisor-pulse --dir "$PULSE_DIR" --title "Supervisor Pulse" --prompt "$prompt")
+	if [[ -n "$PULSE_MODEL" ]]; then
+		pulse_cmd+=(--model "$PULSE_MODEL")
+	fi
+	"${pulse_cmd[@]}" >>"$LOGFILE" 2>&1 &
 
 	local opencode_pid=$!
 	echo "$opencode_pid" >"$PIDFILE"
