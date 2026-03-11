@@ -1108,7 +1108,7 @@ cmd_check() {
 		log_info "Not on main branch ($current_branch), switching..."
 		if ! git -C "$INSTALL_DIR" checkout main --quiet 2>>"$LOG_FILE" &&
 			! git -C "$INSTALL_DIR" checkout -b main origin/main --quiet 2>>"$LOG_FILE"; then
-			log_error "Failed to switch to main branch from '$current_branch'"
+			log_error "Failed to switch to main branch from '$current_branch' in $INSTALL_DIR"
 			update_state "update" "$remote" "branch_switch_failed"
 			run_freshness_checks
 			return 1
