@@ -628,9 +628,9 @@ _cleanup_stale_pinned_issues() {
 
 	# Query all pinned issues via GraphQL (parameterized to prevent injection)
 	local pinned_json
-	pinned_json=$(gh api graphql -F owner="$owner" -F name="$name" -f query='
-		query($owner: String!, $name: String!) {
-			repository(owner: $owner, name: $name) {
+	pinned_json=$(gh api graphql -F owner="$owner" -F name="$name" -f query="
+		query(\$owner: String!, \$name: String!) {
+			repository(owner: \$owner, name: \$name) {
 				pinnedIssues(first: 10) {
 					nodes {
 						issue {
@@ -642,7 +642,8 @@ _cleanup_stale_pinned_issues() {
 					}
 				}
 			}
-		}' 2>>"$LOGFILE" || echo "")
+		}
+		" 2>>"$LOGFILE" || echo "")
 
 	[[ -z "$pinned_json" ]] && return 0
 
@@ -1521,20 +1522,20 @@ _update_quality_issue_body() {
 	local debt_closed=0
 	debt_open=$(gh api graphql \
 		-F searchQuery="repo:${repo_slug} is:issue is:open label:quality-debt" \
-		-f query='
-		query($searchQuery: String!) {
-			search(query: $searchQuery, type: ISSUE, first: 1) {
+		-f query="
+		query(\$searchQuery: String!) {
+			search(query: \$searchQuery, type: ISSUE, first: 1) {
 				issueCount
 			}
-		}' --jq '.data.search.issueCount' 2>>"$LOGFILE" || echo "0")
+		}" --jq '.data.search.issueCount' 2>>"$LOGFILE" || echo "0")
 	debt_closed=$(gh api graphql \
 		-F searchQuery="repo:${repo_slug} is:issue is:closed label:quality-debt" \
-		-f query='
-		query($searchQuery: String!) {
-			search(query: $searchQuery, type: ISSUE, first: 1) {
+		-f query="
+		query(\$searchQuery: String!) {
+			search(query: \$searchQuery, type: ISSUE, first: 1) {
 				issueCount
 			}
-		}' --jq '.data.search.issueCount' 2>>"$LOGFILE" || echo "0")
+		}" --jq '.data.search.issueCount' 2>>"$LOGFILE" || echo "0")
 	# Validate integers
 	[[ "$debt_open" =~ ^[0-9]+$ ]] || debt_open=0
 	[[ "$debt_closed" =~ ^[0-9]+$ ]] || debt_closed=0
