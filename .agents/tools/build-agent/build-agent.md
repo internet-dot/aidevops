@@ -143,7 +143,7 @@ tools:
   webfetch: false # Fetch web content
   task: true      # Spawn subagents
 ---
-```text
+```
 
 **Tool permission options:**
 
