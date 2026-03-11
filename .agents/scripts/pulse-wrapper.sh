@@ -61,7 +61,7 @@ if ! type config_get >/dev/null 2>&1; then
 		local requested_key="$1"
 		local default_value="$2"
 		if [[ "$CONFIG_GET_FALLBACK_WARNED" -eq 0 ]]; then
-			printf '[pulse-wrapper] WARN: fallback config_get active (config-helper unavailable); defaulting key "%s"\n' "$requested_key" >&2
+			printf '[pulse-wrapper] WARN: config_get fallback active; config-helper unavailable, so default config values are being applied starting with key "%s"\n' "$requested_key" >&2
 			CONFIG_GET_FALLBACK_WARNED=1
 		fi
 		printf '%s\n' "$default_value"
