@@ -953,11 +953,28 @@ main() {
 			# XML-escape paths for safe plist embedding (prevents injection
 			# if $HOME or paths contain &, <, > characters)
 			local _xml_wrapper_script _xml_home _xml_opencode_bin _xml_aidevops_dir _xml_path
+			local _headless_xml_env=""
 			_xml_wrapper_script=$(_xml_escape "$wrapper_script")
 			_xml_home=$(_xml_escape "$HOME")
 			_xml_opencode_bin=$(_xml_escape "$opencode_bin")
 			_xml_aidevops_dir=$(_xml_escape "$_aidevops_dir")
 			_xml_path=$(_xml_escape "$PATH")
+			if [[ -n "${AIDEVOPS_HEADLESS_MODELS:-}" ]]; then
+				local _xml_headless_models
+				_xml_headless_models=$(_xml_escape "$AIDEVOPS_HEADLESS_MODELS")
+				_headless_xml_env+=$'\n'
+				_headless_xml_env+=$'\t\t<key>AIDEVOPS_HEADLESS_MODELS</key>'
+				_headless_xml_env+=$'\n'
+				_headless_xml_env+="\t\t<string>${_xml_headless_models}</string>"
+			fi
+			if [[ -n "${AIDEVOPS_HEADLESS_PROVIDER_ALLOWLIST:-}" ]]; then
+				local _xml_headless_allowlist
+				_xml_headless_allowlist=$(_xml_escape "$AIDEVOPS_HEADLESS_PROVIDER_ALLOWLIST")
+				_headless_xml_env+=$'\n'
+				_headless_xml_env+=$'\t\t<key>AIDEVOPS_HEADLESS_PROVIDER_ALLOWLIST</key>'
+				_headless_xml_env+=$'\n'
+				_headless_xml_env+="\t\t<string>${_xml_headless_allowlist}</string>"
+			fi
 
 			# Write the plist (always regenerated to pick up config changes)
 			cat >"$pulse_plist" <<PLIST
@@ -990,6 +1007,7 @@ main() {
 		<string>${_xml_aidevops_dir}</string>
 		<key>PULSE_STALE_THRESHOLD</key>
 		<string>1800</string>
+		${_headless_xml_env}
 	</dict>
 	<key>RunAtLoad</key>
 	<true/>
@@ -1013,12 +1031,23 @@ PLIST
 			# Remove old-style cron entries (direct opencode invocation)
 			# Shell-escape all interpolated paths to prevent command injection
 			# via $(…) or backticks if paths contain shell metacharacters
-			local _cron_aidevops_dir _cron_wrapper_script
+			local _cron_opencode_bin _cron_aidevops_dir _cron_wrapper_script _cron_headless_env=""
+			_cron_opencode_bin=$(_cron_escape "$opencode_bin")
 			_cron_aidevops_dir=$(_cron_escape "$_aidevops_dir")
 			_cron_wrapper_script=$(_cron_escape "$wrapper_script")
+			if [[ -n "${AIDEVOPS_HEADLESS_MODELS:-}" ]]; then
+				local _cron_headless_models
+				_cron_headless_models=$(_cron_escape "$AIDEVOPS_HEADLESS_MODELS")
+				_cron_headless_env+=" AIDEVOPS_HEADLESS_MODELS=${_cron_headless_models}"
+			fi
+			if [[ -n "${AIDEVOPS_HEADLESS_PROVIDER_ALLOWLIST:-}" ]]; then
+				local _cron_headless_allowlist
+				_cron_headless_allowlist=$(_cron_escape "$AIDEVOPS_HEADLESS_PROVIDER_ALLOWLIST")
+				_cron_headless_env+=" AIDEVOPS_HEADLESS_PROVIDER_ALLOWLIST=${_cron_headless_allowlist}"
+			fi
 			(
 				crontab -l 2>/dev/null | grep -v 'aidevops: supervisor-pulse'
-				echo "*/2 * * * * PULSE_DIR=${_cron_aidevops_dir} /bin/bash ${_cron_wrapper_script} >> \"\$HOME/.aidevops/logs/pulse-wrapper.log\" 2>&1 # aidevops: supervisor-pulse"
+				echo "*/2 * * * * PATH=\"/usr/local/bin:/usr/bin:/bin\" OPENCODE_BIN=${_cron_opencode_bin} PULSE_DIR=${_cron_aidevops_dir}${_cron_headless_env} /bin/bash ${_cron_wrapper_script} >> \"\$HOME/.aidevops/logs/pulse-wrapper.log\" 2>&1 # aidevops: supervisor-pulse"
 			) | crontab - || true
 			if crontab -l 2>/dev/null | grep -qF "aidevops: supervisor-pulse"; then
 				print_info "Supervisor pulse enabled (cron, every 2 min). Disable: crontab -e and remove the supervisor-pulse line"
