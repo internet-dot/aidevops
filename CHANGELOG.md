@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.171.10] - 2026-03-11
+
+### Fixed
+
+- resolve SC2016 in stats GraphQL queries
+- prevent GraphQL injection and add slug validation in stats-functions.sh
+- test harness early exit and security posture stderr suppression
+- propagate assert_contains failure exit code in recovery test
+- remove stray "text" from code fence closing in build-agent.md
+
 ## [2.171.9] - 2026-03-11
 
 ### Fixed
