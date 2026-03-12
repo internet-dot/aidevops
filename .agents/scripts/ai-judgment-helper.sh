@@ -1134,7 +1134,7 @@ eval_dataset() {
 			local passed
 			passed=$(echo "$result" | jq -r '.passed // ""')
 
-			if [[ -n "$score" && "$score" != "null" ]]; then
+			if [[ -n "$score" ]]; then
 				total_score=$(awk "BEGIN { print $total_score + $score }")
 				total_count=$((total_count + 1))
 				if [[ "$passed" == "true" ]]; then
