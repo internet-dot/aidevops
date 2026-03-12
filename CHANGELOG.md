@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.171.11] - 2026-03-12
+
+### Fixed
+
+- enforce pulse worker launch validation guidance
+- add runtime auth failure fallback retry
+- retry worker launches with same-cycle provider fallback
+- reallocate pulse slots when product repos are capped
+
 ## [2.171.10] - 2026-03-11
 
 ### Fixed
