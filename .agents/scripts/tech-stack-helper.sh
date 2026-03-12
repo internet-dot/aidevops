@@ -695,7 +695,7 @@ bq_reverse_lookup() {
 			if [[ -n "$kw_conditions" ]]; then
 				kw_conditions="${kw_conditions} OR "
 			fi
-			kw_conditions="${kw_conditions}LOWER(page) LIKE '%${kw}%'"
+			kw_conditions="${kw_conditions}LOWER(page) LIKE '%${kw}%' ESCAPE '\\\\'"
 		done
 		keyword_clause="AND (${kw_conditions})"
 	fi

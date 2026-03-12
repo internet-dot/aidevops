@@ -542,11 +542,15 @@ receive_simplex() {
 
 		# Only ingest messages addressed to this agent or to "all"
 		if [[ "$to_agent" == "$agent_id" || "$to_agent" == "all" ]]; then
-			ingest_remote_message "$msg_id" "$from_agent" "$to_agent" "$msg_type" "$priority" "$convoy" "$payload"
-			count=$((count + 1))
+			if ingest_remote_message "$msg_id" "$from_agent" "$to_agent" "$msg_type" "$priority" "$convoy" "$payload"; then
+				count=$((count + 1))
+			else
+				log_warn "Failed to ingest message $msg_id, leaving envelope for retry"
+				continue
+			fi
 		fi
 
-		# Archive processed envelope
+		# Archive processed envelope (only reached if ingestion succeeded)
 		if ! mv "$envelope_file" "${envelope_file}.processed"; then
 			log_warn "Failed to archive envelope, removing: $envelope_file"
 			rm -f "$envelope_file"
