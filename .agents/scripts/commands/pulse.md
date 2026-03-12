@@ -371,6 +371,8 @@ gh pr close <number> --repo <slug> \
 
 Check `ps axo pid,etime,command | grep '/full-loop' | grep '\.opencode'`. Any worker running 3+ hours with no open PR is likely stuck. Kill it: `kill <pid>`. Comment on the issue with the full audit-quality fields (model, branch, reason, diagnosis, next action — see "Audit-quality state in issue and PR comments" below). This frees a slot. If the worker has recent commits or an open PR with activity, leave it alone — it's making progress.
 
+Before killing a worker for thrash, read the latest worker transcript/log tail and attempt one targeted coaching intervention unless the worker is clearly hard-stuck (for example: repeated identical fatal error, no commits for many hours, or provider backoff exhaustion). Coaching intervention means: post a concise issue comment with the exact blocker pattern, then re-dispatch with a narrower acceptance target and explicit checkpoint deadline. If that coached retry still fails to produce a checkpoint, then kill/requeue and comment why completion was not possible.
+
 ### Struggle-ratio check (t1367)
 
 The "Active Workers" section in the pre-fetched state includes a `struggle_ratio` for each worker that has a worktree. This metric is `messages / max(1, commits)` — a high ratio means the worker is sending many messages but producing few commits (thrashing).
@@ -554,6 +556,8 @@ gh issue edit <number> --repo <slug> --add-assignee "$RUNNER_USER" --add-label "
 sleep 2
 ```
 
+9. **Fill-to-cap post-condition (t1449):** before ending the pulse cycle, compare active workers vs `MAX_WORKERS`. If below cap and runnable scoped issues/PR work exists in any repo class, continue dispatching until cap is reached or no runnable candidates remain. Do not leave slots idle because of class reservations when one class is PR-capped or empty.
+
 ### Candidate discovery baseline (t1443 + t1448)
 
 Do NOT treat `auto-dispatch` or `status:available` as hard gates. They are hints only.
@@ -585,6 +589,7 @@ If you dispatch an unassigned issue without `auto-dispatch`/`status:available`, 
 - Use `--dir <path>` from repos.json
 - Route non-code tasks with `--agent`: SEO, Content, Marketing, Business, Research (see AGENTS.md "Agent Routing")
 - If a dispatched worker later looks stalled, `worker-watchdog.sh` now inspects the recent OpenCode transcript tail before killing it, includes that diagnostic evidence in the retry trail, and gives provider-wait evidence one extra timeout window before re-queueing the issue.
+- Product/tooling reservations are soft optimization targets. When product repos are at daily PR cap (or otherwise non-dispatchable), immediately reallocate those slots to tooling/system work.
 - **Bundle-aware agent routing (t1364.6):** Before dispatching, check if the target repo has a bundle with `agent_routing` overrides. Run `bundle-helper.sh get agent_routing <repo-path>` — if the task domain (code, seo, content, marketing) has a non-default agent, use `--agent <name>`. Example: a content-site bundle routes `marketing` tasks to the Marketing agent instead of Build+. Explicit `--agent` flags in the issue body always override bundle defaults.
 - **Scope boundary (t1405, GH#2928):** ONLY dispatch workers for repos in the pre-fetched state (i.e., repos with `pulse: true` in repos.json). The `PULSE_SCOPE_REPOS` env var (set by `pulse-wrapper.sh`) contains the comma-separated list of in-scope repo slugs. Workers inherit this env var and use it to restrict code changes (branches, PRs) to scoped repos. Workers CAN still file issues on any repo (cross-repo self-improvement), but the pulse must NEVER dispatch a worker to implement a fix on a repo outside this scope — even if an issue exists there. Issues on non-pulse repos enter that repo's queue for their own maintainers to handle.
 - **Lineage context for subtasks (t1408.3):** When dispatching a subtask (task ID contains a dot, e.g., `t1408.3`), include a lineage context block in the dispatch prompt. This tells the worker what the parent task is, what sibling tasks exist, and to focus only on its specific scope. See `tools/ai-assistants/headless-dispatch.md` "Lineage Context for Subtask Workers" for the full format and assembly instructions. Example dispatch with lineage:

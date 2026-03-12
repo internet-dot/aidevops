@@ -73,7 +73,7 @@ fi
 # Configuration
 #######################################
 PULSE_STALE_THRESHOLD="${PULSE_STALE_THRESHOLD:-3600}"                                                  # 60 min hard ceiling (raised from 30 min — GH#2958)
-PULSE_IDLE_TIMEOUT="${PULSE_IDLE_TIMEOUT:-300}"                                                         # 5 min idle = process completed, sitting in file watcher (t1398.3)
+PULSE_IDLE_TIMEOUT="${PULSE_IDLE_TIMEOUT:-600}"                                                         # 10 min idle before kill (reduces false positives during active triage)
 PULSE_IDLE_CPU_THRESHOLD="${PULSE_IDLE_CPU_THRESHOLD:-5}"                                               # CPU% below this = idle (0-100 scale)
 PULSE_PROGRESS_TIMEOUT="${PULSE_PROGRESS_TIMEOUT:-600}"                                                 # 10 min no log output = stuck (GH#2958)
 ORPHAN_MAX_AGE="${ORPHAN_MAX_AGE:-7200}"                                                                # 2 hours — kill orphans older than this
@@ -945,23 +945,25 @@ _append_priority_allocations() {
 	fi
 
 	# Read allocation values
-	local max_workers product_repos tooling_repos product_min tooling_max reservation_pct quality_debt_cap_pct
+	local max_workers product_repos tooling_repos dispatchable_product_repos product_min tooling_max reservation_pct quality_debt_cap_pct
 	max_workers=$(grep '^MAX_WORKERS=' "$alloc_file" | cut -d= -f2) || max_workers=4
 	product_repos=$(grep '^PRODUCT_REPOS=' "$alloc_file" | cut -d= -f2) || product_repos=0
 	tooling_repos=$(grep '^TOOLING_REPOS=' "$alloc_file" | cut -d= -f2) || tooling_repos=0
+	dispatchable_product_repos=$(grep '^DISPATCHABLE_PRODUCT_REPOS=' "$alloc_file" | cut -d= -f2) || dispatchable_product_repos="$product_repos"
 	product_min=$(grep '^PRODUCT_MIN=' "$alloc_file" | cut -d= -f2) || product_min=0
 	tooling_max=$(grep '^TOOLING_MAX=' "$alloc_file" | cut -d= -f2) || tooling_max=0
 	reservation_pct=$(grep '^PRODUCT_RESERVATION_PCT=' "$alloc_file" | cut -d= -f2) || reservation_pct=60
 	quality_debt_cap_pct=$(grep '^QUALITY_DEBT_CAP_PCT=' "$alloc_file" | cut -d= -f2) || quality_debt_cap_pct=30
 
 	echo "Worker pool: **${max_workers}** total slots"
-	echo "Product repos (${product_repos}): **${product_min}** reserved slots (${reservation_pct}% minimum)"
+	echo "Product repos (${product_repos}, dispatchable now: ${dispatchable_product_repos}): **${product_min}** reserved slots (${reservation_pct}% target minimum)"
 	echo "Tooling repos (${tooling_repos}): **${tooling_max}** slots (remainder)"
 	echo "Quality-debt cap: **${quality_debt_cap_pct}%** of worker pool"
 	echo ""
 	echo "**Enforcement rules:**"
-	echo "- Before dispatching a tooling-repo worker, check: are product-repo workers using fewer than ${product_min} slots? If yes, the remaining product slots are reserved — do NOT fill them with tooling work."
-	echo "- If product repos have no pending work (no open issues, no failing PRs), their reserved slots become available for tooling."
+	echo "- Reservations are soft targets, not hard gates. If one class has no dispatchable candidates, immediately reassign its unused slots to the other class."
+	echo "- Product repos at daily PR cap are treated as temporarily non-dispatchable for reservation purposes."
+	echo "- Do not leave slots idle when runnable scoped work exists in any class."
 	echo "- If all ${max_workers} slots are needed for product work, tooling gets 0 (product reservation is a minimum, not a maximum)."
 	echo "- Merges (priority 1) and CI fixes (priority 2) are exempt — they always proceed regardless of class."
 	echo ""
@@ -1882,11 +1884,34 @@ calculate_priority_allocations() {
 	[[ "$product_repos" =~ ^[0-9]+$ ]] || product_repos=0
 	[[ "$tooling_repos" =~ ^[0-9]+$ ]] || tooling_repos=0
 
+	# Count product repos that can actually dispatch now (not blocked by daily PR cap)
+	local dispatchable_product_repos today_utc
+	dispatchable_product_repos=0
+	today_utc=$(date -u +%Y-%m-%d)
+	if [[ "$product_repos" -gt 0 && "$DAILY_PR_CAP" -gt 0 ]]; then
+		while IFS= read -r slug; do
+			[[ -n "$slug" ]] || continue
+			local pr_json daily_pr_count
+			pr_json=$(gh pr list --repo "$slug" --state open --json createdAt --limit 100 2>/dev/null) || pr_json="[]"
+			daily_pr_count=$(echo "$pr_json" | jq --arg today "$today_utc" '[.[] | select(.createdAt | startswith($today))] | length' 2>/dev/null) || daily_pr_count=0
+			[[ "$daily_pr_count" =~ ^[0-9]+$ ]] || daily_pr_count=0
+			if [[ "$daily_pr_count" -lt "$DAILY_PR_CAP" ]]; then
+				dispatchable_product_repos=$((dispatchable_product_repos + 1))
+			fi
+		done < <(jq -r '.initialized_repos[] | select(.pulse == true and (.local_only // false) == false and .slug != "" and .priority == "product") | .slug' "$repos_json" 2>/dev/null)
+	else
+		dispatchable_product_repos="$product_repos"
+	fi
+	[[ "$dispatchable_product_repos" =~ ^[0-9]+$ ]] || dispatchable_product_repos="$product_repos"
+	if [[ "$dispatchable_product_repos" -lt "$product_repos" ]]; then
+		echo "[pulse-wrapper] Product dispatchability reduced by daily PR caps: ${dispatchable_product_repos}/${product_repos} repos can accept new workers" >>"$LOGFILE"
+	fi
+
 	# Calculate reservations
 	# product_min = ceil(max_workers * PRODUCT_RESERVATION_PCT / 100)
 	# Using integer arithmetic: ceil(a/b) = (a + b - 1) / b
 	local product_min tooling_max
-	if [[ "$product_repos" -eq 0 ]]; then
+	if [[ "$dispatchable_product_repos" -eq 0 ]]; then
 		# No product repos — all slots available for tooling
 		product_min=0
 		tooling_max="$max_workers"
@@ -1914,6 +1939,7 @@ calculate_priority_allocations() {
 		echo "MAX_WORKERS=${max_workers}"
 		echo "PRODUCT_REPOS=${product_repos}"
 		echo "TOOLING_REPOS=${tooling_repos}"
+		echo "DISPATCHABLE_PRODUCT_REPOS=${dispatchable_product_repos}"
 		echo "PRODUCT_MIN=${product_min}"
 		echo "TOOLING_MAX=${tooling_max}"
 		echo "PRODUCT_RESERVATION_PCT=${PRODUCT_RESERVATION_PCT}"
