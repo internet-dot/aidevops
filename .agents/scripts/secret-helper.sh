@@ -288,10 +288,24 @@ cmd_set() {
 		print_success "Stored $name in gopass"
 	else
 		print_warning "gopass not available, falling back to credentials.sh"
-		print_info "Now enter the raw secret value for $name (input hidden):"
 		local value
-		read -rs value
-		echo ""
+		while true; do
+			print_info "Now enter the raw secret value for $name (input hidden):"
+			read -rs value
+			echo ""
+
+			if [[ -z "$value" ]]; then
+				print_error "Empty input detected. Paste the secret value and press Enter."
+				continue
+			fi
+
+			if [[ "$value" =~ ^[[:space:]]*(aidevops[[:space:]]+secret|export[[:space:]]+[A-Z_][A-Z0-9_]*=|cmd:[[:space:]]*) ]]; then
+				print_error "Input looks like a command. Paste only the raw secret value."
+				continue
+			fi
+
+			break
+		done
 
 		ensure_credentials_file "$CREDENTIALS_FILE"
 		if [[ -f "$CREDENTIALS_FILE" ]] && grep -q "^export ${name}=" "$CREDENTIALS_FILE" 2>/dev/null; then
