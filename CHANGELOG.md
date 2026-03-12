@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.172.3] - 2026-03-12
+
+### Fixed
+
+- validate fallback secret input values
+- clarify secret set terminal-only flow
+- make qlty/codacy install fail-open in CI (GH#4216) (#4238)
+
 ## [2.172.2] - 2026-03-12
 
 ### Fixed
