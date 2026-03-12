@@ -19,7 +19,7 @@ The runners system is intentionally simple:
 2. **It dispatches `opencode run` for each item** — one worker per task
 3. **Code workers** handle branch -> implementation -> PR -> CI -> merge
 4. **Ops workers** execute the requested SOP/command and report outcomes
-4. **No databases, no state machines, no complex bash pipelines**
+5. **No databases, no state machines, no complex bash pipelines**
 
 The supervisor handles dispatch. The worker command depends on the work type.
 
