@@ -129,6 +129,7 @@ PULSE_MODEL="${PULSE_MODEL:-}"
 HEADLESS_RUNTIME_HELPER="${HEADLESS_RUNTIME_HELPER:-${SCRIPT_DIR}/headless-runtime-helper.sh}"
 REPOS_JSON="${REPOS_JSON:-${HOME}/.config/aidevops/repos.json}"
 STATE_FILE="${HOME}/.aidevops/logs/pulse-state.txt"
+QUEUE_METRICS_FILE="${HOME}/.aidevops/logs/pulse-queue-metrics"
 
 if [[ ! -x "$HEADLESS_RUNTIME_HELPER" ]]; then
 	printf '[pulse-wrapper] ERROR: headless runtime helper is missing or not executable: %s (SCRIPT_DIR=%s)\n' "$HEADLESS_RUNTIME_HELPER" "$SCRIPT_DIR" >&2
@@ -346,6 +347,9 @@ prefetch_state() {
 
 	# Append priority-class worker allocations (t1423)
 	_append_priority_allocations >>"$STATE_FILE"
+
+	# Append adaptive queue-governor guidance (t1455)
+	append_adaptive_queue_governor
 
 	# Export PULSE_SCOPE_REPOS — comma-separated list of repo slugs that
 	# workers are allowed to create PRs/branches on (t1405, GH#2928).
@@ -1678,8 +1682,108 @@ prefetch_contribution_watch() {
 #######################################
 count_active_workers() {
 	local count
-	count=$(ps axo command | grep '[/]full-loop' | grep -c '[.]opencode') || count=0
+	count=$(ps axo command | grep '\.opencode run' | grep '/full-loop Implement issue #' | grep -v '/pulse' | grep -c -v grep) || count=0
 	echo "$count"
+	return 0
+}
+
+#######################################
+# Append adaptive queue-governor guidance to pre-fetched state
+#
+# Uses observed queue totals and trend vs previous cycle to derive an
+# adaptive PR-vs-issue dispatch focus. This avoids static per-repo
+# thresholds and shifts effort toward PR burn-down when PR backlog grows.
+#######################################
+append_adaptive_queue_governor() {
+	if [[ ! -f "$STATE_FILE" ]]; then
+		return 0
+	fi
+
+	local total_prs total_issues ready_prs failing_prs
+	total_prs=$(awk '/^### Open PRs \([0-9]+\)/ { line=$0; gsub(/[^0-9]/, "", line); sum+=line } END { print sum+0 }' "$STATE_FILE")
+	total_issues=$(awk '/^### Open Issues \([0-9]+\)/ { line=$0; gsub(/[^0-9]/, "", line); sum+=line } END { print sum+0 }' "$STATE_FILE")
+	ready_prs=$(rg -c '\[checks: PASS\].*\[review: APPROVED\]' "$STATE_FILE" 2>/dev/null || echo "0")
+	failing_prs=$(rg -c '\[checks: FAIL\]|\[review: CHANGES_REQUESTED\]' "$STATE_FILE" 2>/dev/null || echo "0")
+
+	[[ "$total_prs" =~ ^[0-9]+$ ]] || total_prs=0
+	[[ "$total_issues" =~ ^[0-9]+$ ]] || total_issues=0
+	[[ "$ready_prs" =~ ^[0-9]+$ ]] || ready_prs=0
+	[[ "$failing_prs" =~ ^[0-9]+$ ]] || failing_prs=0
+
+	local prev_total_prs=0 prev_total_issues=0 prev_ready_prs=0 prev_failing_prs=0
+	if [[ -f "$QUEUE_METRICS_FILE" ]]; then
+		while IFS='=' read -r key value; do
+			case "$key" in
+			prev_total_prs) prev_total_prs="$value" ;;
+			prev_total_issues) prev_total_issues="$value" ;;
+			prev_ready_prs) prev_ready_prs="$value" ;;
+			prev_failing_prs) prev_failing_prs="$value" ;;
+			esac
+		done <"$QUEUE_METRICS_FILE"
+	fi
+
+	[[ "$prev_total_prs" =~ ^-?[0-9]+$ ]] || prev_total_prs=0
+	[[ "$prev_total_issues" =~ ^-?[0-9]+$ ]] || prev_total_issues=0
+	[[ "$prev_ready_prs" =~ ^-?[0-9]+$ ]] || prev_ready_prs=0
+	[[ "$prev_failing_prs" =~ ^-?[0-9]+$ ]] || prev_failing_prs=0
+
+	local pr_delta issue_delta ready_delta failing_delta
+	pr_delta=$((total_prs - prev_total_prs))
+	issue_delta=$((total_issues - prev_total_issues))
+	ready_delta=$((ready_prs - prev_ready_prs))
+	failing_delta=$((failing_prs - prev_failing_prs))
+
+	local denominator pr_share_pct growth_bias pr_focus_pct new_issue_pct
+	denominator=$((total_prs + total_issues))
+	if [[ "$denominator" -lt 1 ]]; then
+		denominator=1
+	fi
+	pr_share_pct=$(((total_prs * 100) / denominator))
+	growth_bias=0
+	if [[ "$pr_delta" -gt 0 ]]; then
+		growth_bias=10
+	elif [[ "$pr_delta" -lt 0 ]]; then
+		growth_bias=-5
+	fi
+	pr_focus_pct=$((35 + (pr_share_pct / 2) + growth_bias))
+	if [[ "$pr_focus_pct" -lt 35 ]]; then
+		pr_focus_pct=35
+	elif [[ "$pr_focus_pct" -gt 85 ]]; then
+		pr_focus_pct=85
+	fi
+	new_issue_pct=$((100 - pr_focus_pct))
+
+	local queue_mode
+	queue_mode="balanced"
+	if [[ "$ready_prs" -gt 0 && "$pr_delta" -ge 0 ]]; then
+		queue_mode="merge-heavy"
+	elif [[ "$pr_focus_pct" -ge 60 ]]; then
+		queue_mode="pr-heavy"
+	fi
+
+	cat >"$QUEUE_METRICS_FILE" <<EOF
+prev_total_prs=${total_prs}
+prev_total_issues=${total_issues}
+prev_ready_prs=${ready_prs}
+prev_failing_prs=${failing_prs}
+EOF
+
+	{
+		echo ""
+		echo "## Adaptive Queue Governor"
+		echo "- Queue totals: PRs=${total_prs} (delta ${pr_delta}), issues=${total_issues} (delta ${issue_delta})"
+		echo "- PR execution pressure: ready=${ready_prs} (delta ${ready_delta}), failing_or_changes_requested=${failing_prs} (delta ${failing_delta})"
+		echo "- Adaptive mode this cycle: ${queue_mode}"
+		echo "- Recommended dispatch focus: PR remediation ${pr_focus_pct}% / new issue dispatch ${new_issue_pct}%"
+		echo ""
+		echo "PULSE_QUEUE_MODE=${queue_mode}"
+		echo "PR_REMEDIATION_FOCUS_PCT=${pr_focus_pct}"
+		echo "NEW_ISSUE_DISPATCH_PCT=${new_issue_pct}"
+		echo ""
+		echo "When PR backlog is rising, prioritize merge-ready and failing-check PR advancement before new issue starts."
+	} >>"$STATE_FILE"
+
+	echo "[pulse-wrapper] Adaptive queue governor: mode=${queue_mode} prs=${total_prs} issues=${total_issues} pr_focus=${pr_focus_pct}%" >>"$LOGFILE"
 	return 0
 }
 

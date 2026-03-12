@@ -50,9 +50,16 @@ AVAILABLE=$((MAX_WORKERS - WORKER_COUNT))
 # shows PRODUCT_MIN and TOOLING_MAX. Read these values:
 PRODUCT_MIN=$(grep '^PRODUCT_MIN=' ~/.aidevops/logs/pulse-priority-allocations 2>/dev/null | cut -d= -f2 || echo 0)
 TOOLING_MAX=$(grep '^TOOLING_MAX=' ~/.aidevops/logs/pulse-priority-allocations 2>/dev/null | cut -d= -f2 || echo "$MAX_WORKERS")
+
+# Adaptive queue governor (t1455) from pre-fetched state
+PULSE_QUEUE_MODE=$(grep '^PULSE_QUEUE_MODE=' ~/.aidevops/logs/pulse-state.txt 2>/dev/null | cut -d= -f2 || echo "balanced")
+PR_REMEDIATION_FOCUS_PCT=$(grep '^PR_REMEDIATION_FOCUS_PCT=' ~/.aidevops/logs/pulse-state.txt 2>/dev/null | cut -d= -f2 || echo 50)
+NEW_ISSUE_DISPATCH_PCT=$(grep '^NEW_ISSUE_DISPATCH_PCT=' ~/.aidevops/logs/pulse-state.txt 2>/dev/null | cut -d= -f2 || echo 50)
 ```
 
 If `AVAILABLE <= 0`: you can still merge ready PRs, but don't dispatch new workers.
+
+If `PULSE_QUEUE_MODE` is `pr-heavy` or `merge-heavy`, spend most dispatch capacity on existing PR advancement (merge-ready first, then failing checks/changes requested) and limit new issue starts to the adaptive budget (`NEW_ISSUE_DISPATCH_PCT`).
 
 ### Priority-class enforcement (t1423)
 
@@ -82,6 +89,14 @@ Scan the pre-fetched state above. Act immediately on each item — don't build a
 **Audit trail principle:** Every state change you make (merge, close, label, dispatch) MUST have a comment explaining WHY you did it and linking to evidence. Links must be **bidirectional** — the issue comment references the PR, AND the PR comment references the issue. GitHub only auto-links when PR bodies contain `Closes #N` or `Resolves #N`; if the PR body doesn't already reference the issue, add a comment on the PR too (e.g., `gh pr comment <number> --repo <slug> --body "Resolves #<issue>"`). A future human or agent reading either the issue or the PR should be able to trace the full story without checking logs.
 
 ### PRs — merge, fix, or flag
+
+**Adaptive mode rule (t1455):**
+
+- `merge-heavy`: complete merge-ready PRs first, then PR fix workers, then only minimal new issue dispatch.
+- `pr-heavy`: prioritize PR repair/merge throughput over opening fresh issue work.
+- `balanced`: normal ordering.
+
+Treat this as a live queue-pressure signal, not a static threshold.
 
 **External contributor gate (MANDATORY):** Before merging ANY PR, check if the author is a repo collaborator. The permission check must **fail closed** — if the API call itself fails, do NOT auto-merge and do NOT assume the author is external.
 
@@ -532,6 +547,14 @@ If decomposition succeeds (`SUBTASK_COUNT >= 2`):
 ### Dispatch workers for open issues
 
 For each dispatchable issue (intelligence-first):
+
+When `PULSE_QUEUE_MODE` is `pr-heavy` or `merge-heavy`, limit issue dispatches to the current cycle budget:
+
+```bash
+ISSUE_DISPATCH_BUDGET=$(((AVAILABLE * NEW_ISSUE_DISPATCH_PCT) / 100))
+```
+
+If budget is exhausted, stop opening new issue workers and continue PR advancement work.
 
 1. Skip if a worker is already running for it locally (check `ps` output for the issue number)
 2. Skip if an open PR already exists for it (check PR list)
