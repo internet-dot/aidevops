@@ -1,6 +1,6 @@
 ---
 name: ai-search-readiness
-description: Orchestrate end-to-end AI search readiness by chaining fan-out modeling, GEO, SRO, hallucination defense, and agent discoverability checks
+description: Orchestrate AI search readiness across grounding triage, fan-out modeling, GEO, SRO, integrity hardening, discoverability checks, and citation monitoring
 mode: subagent
 tools:
   read: true

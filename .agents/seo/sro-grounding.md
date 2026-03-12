@@ -69,7 +69,7 @@ Selection Rate Optimization (SRO) focuses on whether a source gets selected into
 - Prefer short declarative sentences over vague promotional phrasing
 - Keep numerics and qualifiers explicit (thresholds, limits, timelines)
 - Use lists/tables only when they preserve factual precision
-- Keep policy, pricing, and capability statements up to date
+- Keep policy, pricing, and capability statements up-to-date
 - Refresh critical sections on a defined cadence to preserve snippet freshness
 
 ## Common Failure Modes

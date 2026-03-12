@@ -198,15 +198,16 @@ See `seo/google-search-console.md` for query patterns.
 
 Use a retrieval-first workflow for AI search surfaces:
 
-1. Use `seo/query-fanout-research.md` to model thematic sub-queries for target intents
-2. Use `seo/geo-strategy.md` to extract decision criteria and map coverage gaps
-3. Use `seo/sro-grounding.md` to improve snippet selection likelihood and grounding density
-4. Use `seo/ai-hallucination-defense.md` to remove contradictions and unsupported claims
-5. Use `seo/ai-agent-discovery.md` to validate that autonomous agents can actually find key information
+0. Run `/seo-ai-baseline example.com` to capture grounding eligibility, coverage, selection, integrity, and discoverability baselines
+1. Run `/seo-fanout "target query"` (`seo/query-fanout-research.md`) to model thematic sub-queries for target intents
+2. Run `/seo-geo example.com` (`seo/geo-strategy.md`) to extract decision criteria and map coverage gaps
+3. Run `/seo-sro example.com` (`seo/sro-grounding.md`) to improve snippet selection likelihood and grounding density
+4. Run `/seo-hallucination-defense example.com` (`seo/ai-hallucination-defense.md`) to remove contradictions and unsupported claims
+5. Run `/seo-agent-discovery example.com` (`seo/ai-agent-discovery.md`) to validate that autonomous agents can actually find key information
 
 This keeps focus on deterministic retrieval signals (content clarity, structure, consistency, discoverability) instead of volatile prompt-rank tracking.
 
-For full execution order, use `seo/ai-search-readiness.md`.
+For full execution order and scorecard guidance, use `seo/ai-search-readiness.md`.
 
 ### SERP Analysis
 
