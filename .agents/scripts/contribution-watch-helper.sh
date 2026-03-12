@@ -225,7 +225,7 @@ _is_signal_reason() {
 	if [[ -z "$reason" ]]; then
 		return 1
 	fi
-	if [[ "$reason" =~ ^(author|comment|mention|review_requested|subscribed)$ ]]; then
+	if [[ "$reason" =~ ^(${SIGNAL_REASONS})$ ]]; then
 		return 0
 	fi
 	return 1
@@ -543,7 +543,8 @@ cmd_scan() {
 
 		local last_notified
 		last_notified=$(echo "$state" | jq -r --arg key "$item_key" '.items[$key].last_notified // ""')
-		if [[ -n "$last_notified" && ! "$updated" > "$last_notified" ]]; then
+		# ISO 8601 UTC timestamps sort lexicographically, so string compare is valid.
+		if [[ -n "$last_notified" ]] && [[ ! "$updated" > "$last_notified" ]]; then
 			continue
 		fi
 
