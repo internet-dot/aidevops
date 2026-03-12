@@ -891,22 +891,32 @@ ${user_message}"
 		raw_result=$("$AI_HELPER" --prompt "$full_prompt" --model haiku --max-tokens 200 || echo "")
 
 		if [[ -n "$raw_result" ]]; then
-			# Extract JSON from response: strip markdown fences, then extract first valid JSON object
+			# Extract JSON from response: handle fenced blocks and embedded wrapper text
 			local json_result
-			json_result=$(echo "$raw_result" |
-				sed 's/^```[a-zA-Z]*//;s/^```//' |
-				tr -d '\n' |
-				grep -o '{[^{}]*"score"[^{}]*}' |
-				head -1)
+			json_result=$(printf '%s' "$raw_result" | jq -Rrs '
+				. as $text
+				| (
+					($text | fromjson?)
+					// (
+						$text
+						| gsub("(?m)^```[A-Za-z0-9_-]*\\n"; "")
+						| gsub("(?m)^```$"; "")
+						| capture("(?s)(?<json>\\{.*\\})").json
+						| fromjson?
+					)
+				) // empty
+				| select(type == "object" and has("score"))
+				| @json
+			' 2>/dev/null)
 
 			if [[ -n "$json_result" ]]; then
 				# Parse score and details from JSON using jq (robust, handles whitespace/key order)
 				local score
-				score=$(echo "$json_result" | jq -r '.score // ""')
+				score=$(printf '%s' "$json_result" | jq -r '.score // ""')
 				local details
-				details=$(echo "$json_result" | jq -r '.details // ""')
+				details=$(printf '%s' "$json_result" | jq -r '.details // ""')
 
-				if [[ -n "$score" && "$score" != "null" ]]; then
+				if [[ -n "$score" ]]; then
 					# Determine pass/fail using awk for float comparison
 					local passed
 					passed=$(awk -v s="$score" -v t="$threshold" 'BEGIN { print (s >= t) ? "true" : "false" }')
