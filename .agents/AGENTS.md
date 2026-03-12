@@ -42,6 +42,16 @@ Subagent write restrictions: on `main`/`master`, subagents may ONLY write to `RE
 
 ---
 
+## Operational Routines (Non-Code Work)
+
+Not every autonomous task should use `/full-loop`. Use this decision rule:
+- **Code change needed** (repo files, tests, PRs) → `/full-loop`
+- **Operational execution** (reports, audits, monitoring, outreach, client ops) → run a domain agent/command directly, with no branch/PR ceremony
+
+For setup workflow, safety gates, and scheduling patterns, use `/routine` or read `.agents/scripts/commands/routine.md`.
+
+---
+
 ## Self-Improvement
 
 Every agent session — interactive, worker, or supervisor — should improve the system, not just complete its task. This is a universal principle, not specific to any one command.
