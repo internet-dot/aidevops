@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.172.10] - 2026-03-13
+
+### Changed
+
+- Refactor: extract failure message helper in test-worker-sandbox-helper.sh (#4291)
+
+### Fixed
+
+- add file existence checks in session-miner to reduce file_not_found failures (#4321)
+- harden JSON extraction in run_single_evaluator against braces in details (#4320)
+- deploy from current worktree path instead of canonical main checkout (#4319)
+- tighten pulse cold-start timeout when underfilled (#4323)
+- replace echo pipe with herestring in email-delivery-test-helper.sh
+- address CHANGES_REQUESTED review feedback on PR #4174
+- address review feedback — grep -c accuracy, font-size threshold, ANSI stripping, backslash pattern
+- prevent silent failure in secret-helper get_secret_value
+- docs consistency, portability, and minor code improvements
+- remove dead code, error suppression, and improve reliability
+- base64-encode jq values to prevent shell injection in declare (#4316)
+- replace grep|cut with while IFS= read loop for task_id parsing (#4289)
+- allow dots in routine names per coderabbit suggestion (#4292)
+- enforce browser QA vision size guardrails (#4310)
+- verify and document GH#4271 quality-debt findings in stats-wrapper.sh (#4288)
+
 ## [2.172.9] - 2026-03-13
 
 ### Fixed
