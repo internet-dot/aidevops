@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.172.19] - 2026-03-13
+
+### Changed
+
+- Maintenance: claim t1473
+- Maintenance: remove redundant jq identity pipe in cmd_usage (#4403)
+- Maintenance: remove redundant env-var prefix in shell command examples (#4407)
+- Refactor: deduplicate script version update path for release bumps (#4356)
+
+### Fixed
+
+- enforce worktree-first guidance in guardrails (#4443)
+- address PR #163 review feedback on browser automation docs (#4439)
+- address PR #364 gemini review — batch script guard + relative paths (#4438)
+- two-layer dispatch dedup + earlier thrash detection (GH#4400) (#4441)
+- address PR #352 review feedback — atomic DELETEs and env-var path (GH#3776) (#4440)
+- use empty-string check for cert expiry date parse failure (GH#4275) (#4434)
+- use .param set for FTS5 MATCH to prevent SQL injection (GH#3155)
+- replace curl|sh with safer download-review-execute pattern (GH#3107)
+- address GH#3147 quality-debt — regex injection hardening + remove 2>/dev/null suppressions
+- use mktemp for secure temp file in build-mcp key injection example (GH#4267)
+- use explicit uname check for stat mtime (GH#3513) (#4422)
+- add PPID guard to emergency kill loop to protect interactive sessions (GH#3453) (#4421)
+- group local declarations in auto-batch block (t3491) (#4426)
+- clean up temp dispatch scripts after execution (GH#3497) (#4428)
+- use mktemp instead of hardcoded /tmp path in build-mcp key injection example (#4417)
+- remove non-existent status fields from chrome-webstore-release docs (GH#3693) (#4418)
+- align crft-lookup.md commands and schema with tech-stack-helper.sh (#4423)
+- use type -P for Continue.dev detection to avoid bash builtin false positive (GH#3452) (#4419)
+- add EXIT trap for robust temp file cleanup on abrupt termination (GH#3560) (#4425)
+- restore explicit phase list in ai-search-readiness description (GH#4266) (#4416)
+- count all PRs (open+merged+closed) for daily cap (GH#4412) (#4415)
+- restore phpdoc formatting in wordpress guide examples (#4414)
+- address PR #4393 inline review suggestions in wappalyzer.md (#4408)
+- use += to append to cleanup file registry (#4406)
+- remove spaces in process substitution per gemini-code-assist review (#4405)
+- add input/output label to opus cost pricing format (#4404)
+- add parameterized SQLite queries to prevent SQL injection (GH#3527) (#4402)
+- address PR #1955 review feedback (t3638) (#4401)
+- add eval checkpoint cleanup to Phase 1c and Phase 4b (GH#3637) (#4398)
+- elevate API key security note to blockquote (GH#3554) (#4397)
+- address high-severity PR #1184 review findings (#4396)
+- correct function counts and flag eval style violations in t316.1 (#4394)
+- clarify opus cost multiplier with explicit pricing basis (GH#3569) (#4391)
+- suppress SC1091 info in voice-helper.sh, verify tempfile security fixes (GH#3557) (#4379)
+- add default case for invalid mode in coderabbit-cli.sh (GH#3520) (#4376)
+- correct Grok model name to Grok Imagine in UI-only comment (#4377)
+- add error handling for tty write and close operations (#4378)
+- guard empty array expansions for Bash < 4.4 compat (GH#3544) (#4380)
+- add error handling for TTY write and close failures (#4381)
+- remove tautological 'SEO optimization' in accessibility.md (#4382)
+- use process substitution for find loops (GH#3516) (#4383)
+- harden against shell injection and prompt injection (#4388)
+- correct misleading barge-in comment to accurately describe AEC limitation (#4385)
+- document docker guard rationale, verify all HIGH findings from GH#3553 (#4386)
+- replace eval with bash array in merge_task_pr (GH#3565) (#4389)
+- separate preflight execution from output parsing (#4390)
+- remove unused server_port param from generate_bot_template (#4375)
+- filter unresolved threads by AI reviewer and surface API errors (GH#3585) (#4371)
+- warn on insecure sshpass password file permissions (GH#3574) (#4372)
+- add set -euo pipefail to routine-scheduler.sh (GH#3664) (#4373)
+- guard jq failures to prevent skill-sources.json data loss (#4335)
+- resolve critical quality-debt in email-health-check-helper.sh (#4336)
+- document npm package unavailability and add setup instructions (#4337)
+- add setup-modules/ to npm package files manifest (GH#3594) (#4339)
+- use || true instead of || echo "" for grep guard in pulse.sh (GH#3679) (#4340)
+- clarify SIGKILL/SIGTERM exit code mapping in portable_timeout (GH#3610) (#4341)
+- improve health issue title command error handling (#4358)
+- consolidate jq parsing in skill URL flow test (#4355)
+
 ## [2.172.18] - 2026-03-13
 
 ### Changed
