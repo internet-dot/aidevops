@@ -138,7 +138,7 @@ curl https://api.anthropic.com/v1/messages \
 
 **Supported formats**: JPEG, PNG, GIF, WebP. Max 5MB per image (API), 10MB (Claude.ai).
 
-**Image size limits**: Images larger than 8000×8000 px are rejected (hard limit ≈ 64 megapixels). Images with a long edge exceeding 1568 px are automatically downscaled by the API. For optimal latency, Anthropic recommends resizing to ≤1.15 megapixels with each dimension ≤1568 px. Full-page screenshots easily exceed these bounds. The API rejects oversized images with: `At least one of the image dimensions exceed max allowed size: 8000 pixels`. Resize before submission:
+**Image size limits**: Images larger than 8000×8000 px are rejected (hard limit ≈ 64 megapixels). Images with a long edge exceeding 1568 px are automatically downscaled by the API. For optimal latency, Anthropic recommends resizing to ≤1.15 megapixels where width ≤1568 px and height ≤1568 px. Full-page screenshots easily exceed these bounds. The API rejects oversized images with: `At least one of the image dimensions exceed max allowed size: 8000 pixels`. Resize before submission:
 
 ```bash
 # macOS (built-in, no install) — resize to 1568px max on longest side
