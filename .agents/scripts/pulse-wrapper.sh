@@ -38,6 +38,14 @@
 #   where launchd fires between rm -f and the next write, which caused the
 #   82-concurrent-pulse incident (2026-03-13T02:06:01Z, issue #4318).
 #
+# Wrapper-level PID lock (GH#4409):
+#   A second lock file (pulse-wrapper.lock) guards the wrapper process itself.
+#   It is acquired at the very start of main() — before check_dedup() — using
+#   kill -0 to verify liveness. A trap EXIT writes the IDLE sentinel so the
+#   file is never absent (same sentinel protocol as PIDFILE). This prevents
+#   concurrent wrapper instances during the setup/prefetch phase, which is
+#   where the 8+ concurrent pulse incident originated.
+#
 # Called by launchd every 120s via the supervisor-pulse plist.
 
 set -euo pipefail
@@ -149,6 +157,7 @@ SESSION_COUNT_WARN=$(_validate_int SESSION_COUNT_WARN "$SESSION_COUNT_WARN" 5 1)
 # _sanitize_markdown and _sanitize_log_field provided by worker-lifecycle-common.sh
 
 PIDFILE="${HOME}/.aidevops/logs/pulse.pid"
+WRAPPER_LOCKFILE="${HOME}/.aidevops/logs/pulse-wrapper.lock"
 LOGFILE="${HOME}/.aidevops/logs/pulse.log"
 WRAPPER_LOGFILE="${HOME}/.aidevops/logs/pulse-wrapper.log"
 SESSION_FLAG="${HOME}/.aidevops/logs/pulse-session.flag"
@@ -172,6 +181,58 @@ fi
 # Ensure log directory exists
 #######################################
 mkdir -p "$(dirname "$PIDFILE")"
+
+#######################################
+# Acquire wrapper-level PID lock (GH#4409)
+#
+# Guards the wrapper process itself — acquired at the very start of main()
+# before check_dedup(). Prevents concurrent wrapper instances during the
+# setup/prefetch phase (cleanup, prefetch_state, calculate_max_workers)
+# which is where the 8+ concurrent pulse incident originated.
+#
+# Uses the same sentinel protocol as PIDFILE (GH#4324): the lock file is
+# NEVER deleted — only overwritten with "IDLE:<ts>" on exit. A trap EXIT
+# is registered to ensure the sentinel is always written, even on error.
+#
+# Returns: 0 if lock acquired, 1 if another wrapper instance is running
+#######################################
+acquire_wrapper_lock() {
+	# Ensure log directory exists (may not exist on first run)
+	mkdir -p "$(dirname "$WRAPPER_LOCKFILE")"
+
+	if [[ -f "$WRAPPER_LOCKFILE" ]]; then
+		local lock_content
+		lock_content=$(cat "$WRAPPER_LOCKFILE" 2>/dev/null || echo "")
+
+		# Empty or IDLE sentinel — safe to proceed
+		if [[ -z "$lock_content" ]] || [[ "$lock_content" == IDLE:* ]]; then
+			: # fall through to write our PID
+		elif [[ "$lock_content" =~ ^[0-9]+$ ]]; then
+			# Numeric PID — check if the process is still alive
+			if kill -0 "$lock_content" 2>/dev/null; then
+				# Another wrapper instance is running — skip this invocation
+				echo "[pulse-wrapper] Wrapper already running (PID ${lock_content}) — skipping" >>"$WRAPPER_LOGFILE"
+				return 1
+			fi
+			# Process is dead — stale lock; fall through to overwrite
+			echo "[pulse-wrapper] Stale wrapper lock (PID ${lock_content} dead) — overwriting" >>"$WRAPPER_LOGFILE"
+		else
+			# Unrecognised content — treat as safe to proceed
+			echo "[pulse-wrapper] Unrecognised wrapper lock content '${lock_content}' — treating as idle" >>"$WRAPPER_LOGFILE"
+		fi
+	fi
+
+	# Write our PID to claim the lock
+	echo "$$" >"$WRAPPER_LOCKFILE"
+
+	# Register EXIT trap to write IDLE sentinel — never leave the file absent.
+	# Uses the same sentinel protocol as PIDFILE (GH#4324) to prevent the race
+	# window where launchd fires between rm -f and the next write.
+	# shellcheck disable=SC2064
+	trap "echo 'IDLE:\$(date -u +%Y-%m-%dT%H:%M:%SZ)' >\"$WRAPPER_LOCKFILE\"" EXIT
+
+	return 0
+}
 
 #######################################
 # Check for stale PID file and clean up
@@ -2423,6 +2484,14 @@ run_underfill_worker_recycler() {
 # even the API calls themselves add latency that delays dispatch.
 #######################################
 main() {
+	# GH#4409: Acquire wrapper-level PID lock before any other gate.
+	# This prevents concurrent wrapper instances during the setup/prefetch
+	# phase. Must be first — before check_session_gate() — so the EXIT trap
+	# is registered even if the session gate or dedup check exits early.
+	if ! acquire_wrapper_lock; then
+		return 0
+	fi
+
 	if ! check_session_gate; then
 		return 0
 	fi
