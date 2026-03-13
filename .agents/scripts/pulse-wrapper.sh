@@ -958,7 +958,17 @@ This PR modifies \`.github/workflows/\` files but the GitHub OAuth token used by
 #######################################
 prefetch_active_workers() {
 	local worker_lines
-	worker_lines=$(ps axo pid,etime,command | grep '/full-loop' | grep '[.]opencode' || true)
+	# Use the same awk filter as count_active_workers() so the snapshot is
+	# consistent with the global capacity counter: include only .opencode
+	# /full-loop workers and exclude the supervisor pulse via token-boundary
+	# matching on --role pulse + --session-key supervisor-pulse.
+	# The !(...) guard is kept on one line to avoid a GNU awk parse error when
+	# the opening parenthesis follows a newline after '!'.
+	worker_lines=$(ps axo pid,etime,command | awk '
+		index($0, ".opencode run") > 0 &&
+		index($0, "/full-loop") > 0 &&
+		!($0 ~ /(^|[[:space:]])--role([=[:space:]])pulse([[:space:]]|$)/ && $0 ~ /(^|[[:space:]])--session-key([=[:space:]])supervisor-pulse([[:space:]]|$)/) { print }
+	' || true)
 
 	echo ""
 	echo "# Active Workers"
@@ -1916,13 +1926,14 @@ normalize_active_issue_assignments() {
 #######################################
 count_active_workers() {
 	local count
+	# Token-boundary exclusion: only suppress lines where BOTH --role pulse AND
+	# --session-key supervisor-pulse appear as whole arguments (not substrings).
+	# The !(...) guard is kept on one line to avoid a GNU awk parse error when
+	# the opening parenthesis follows a newline after '!'.
 	count=$(ps axo command | awk '
 		index($0, ".opencode run") > 0 &&
 		index($0, "/full-loop") > 0 &&
-		!(
-			$0 ~ /(^|[[:space:]])--role([=[:space:]])pulse([[:space:]]|$)/ &&
-			$0 ~ /(^|[[:space:]])--session-key([=[:space:]])supervisor-pulse([[:space:]]|$)/
-		) {
+		!($0 ~ /(^|[[:space:]])--role([=[:space:]])pulse([[:space:]]|$)/ && $0 ~ /(^|[[:space:]])--session-key([=[:space:]])supervisor-pulse([[:space:]]|$)/) {
 			count++
 		}
 		END {
@@ -1979,8 +1990,12 @@ has_worker_for_repo_issue() {
 	fi
 
 	local matches
+	# Exact --dir match: require path to appear as a whole --dir argument
+	# (space-separated or = form, optionally with trailing slash) to prevent
+	# sibling-path false positives (e.g. /tmp/aidevops matching /tmp/aidevops-tools).
 	matches=$(ps axo command | awk -v issue="$issue_number" -v path="$repo_path" '
-		index($0, path) > 0 && ($0 ~ ("issue-" issue "([^0-9]|$)") || $0 ~ ("Issue #" issue "([^0-9]|$)")) { count++ }
+		($0 ~ ("(^|[[:space:]])--dir[[:space:]]+" path "([[:space:]]|$)") || $0 ~ ("(^|[[:space:]])--dir=" path "([[:space:]]|$)") || $0 ~ ("(^|[[:space:]])--dir[[:space:]]+" path "/([[:space:]]|$)") || $0 ~ ("(^|[[:space:]])--dir=" path "/([[:space:]]|$)")) &&
+		($0 ~ ("issue-" issue "([^0-9]|$)") || $0 ~ ("Issue #" issue "([^0-9]|$)")) { count++ }
 		END { print count + 0 }
 	') || matches=0
 	[[ "$matches" =~ ^[0-9]+$ ]] || matches=0
