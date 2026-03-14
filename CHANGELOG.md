@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.172.29] - 2026-03-14
+
+### Fixed
+
+- add wrapper-level forced recycle when pulse LLM exits early while underfilled (#4620)
+- remove 2>/dev/null from source to expose syntax errors (#4613)
+- use install -d -m 700 for ~/.ssh directory creation (#4612)
+- address quality-debt review feedback for vector-search.md (#4611)
+- skip approval-only reviews in scan-merged to prevent false-positive issues (#4609)
+- add explicit return 0 to get_domain() in eeat-score-helper.sh (#4608)
+- make AI lock checks atomic (#4607)
+- replace bash 4.0+ features with portable alternatives in 2 scripts (#4603)
+- address PR #2326 review feedback on model-routing.md (#4598)
+- resolve gemini review feedback on auto-verify logic (#4605)
+- address PR #2255 review feedback on t1327-brief.md (#4594)
+
 ## [2.172.28] - 2026-03-14
 
 ### Fixed
