@@ -2868,15 +2868,17 @@ cmd_bench() {
 			wait "$pid" 2>/dev/null || true
 		done
 
-		# Collect judge scores if enabled
-		declare -A judge_scores=()
+		# Collect judge scores if enabled (bash 3.2 compatible)
+		local judge_scores_data=""
+		local judge_models=""
 		if [[ "$judge_flag" == true ]]; then
 			echo "  Scoring with judge (haiku)..."
 			local judge_output
 			judge_output=$(_bench_judge_score "$p" "$bench_dir")
 			while IFS='|' read -r jm js; do
 				[[ -z "$jm" ]] && continue
-				judge_scores["$jm"]="$js"
+				judge_scores_data+="${jm}|${js}"$'\n'
+				judge_models+="${jm}"$'\n'
 			done <<<"$judge_output"
 		fi
 
@@ -2933,7 +2935,15 @@ cmd_bench() {
 			local cost_fmt
 			cost_fmt=$(printf "\$%.4f" "$cost")
 
-			local judge_score="${judge_scores[$m]:-}"
+			local judge_score=""
+			if [[ -n "$judge_models" ]] && echo "$judge_models" | grep -Fxq "$m"; then
+				while IFS='|' read -r stored_model stored_score; do
+					if [[ "$stored_model" == "$m" ]]; then
+						judge_score="$stored_score"
+						break
+					fi
+				done <<<"$judge_scores_data"
+			fi
 
 			# Store result
 			_store_bench_result "$m" "$p" "$latency" "$tokens_in" "$tokens_out" "$cost" \
