@@ -19,7 +19,7 @@
 #
 # Options:
 #   --rules-dir DIR     Override rules directory (default: .agents/rules/)
-#   --state-file FILE   Override state file (default: /tmp/ttsr-state-<pid>)
+#   --state-file FILE   Override state file (default: /tmp/ttsr-state-<ppid>)
 #   --turn N            Current conversation turn number (default: 1)
 #   --format json|text  Output format (default: text)
 #   -                   Read output text from stdin instead of argument
@@ -52,19 +52,22 @@ DEFAULT_STATE_FILE="/tmp/ttsr-state-${PPID:-$$}"
 # =============================================================================
 
 log_error() {
-	local msg="$1"
+	local msg
+	msg="$1"
 	printf '[ERROR] %s\n' "$msg" >&2
 	return 0
 }
 
 log_warn() {
-	local msg="$1"
+	local msg
+	msg="$1"
 	printf '[WARN] %s\n' "$msg" >&2
 	return 0
 }
 
 log_info() {
-	local msg="$1"
+	local msg
+	msg="$1"
 	printf '[INFO] %s\n' "$msg" >&2
 	return 0
 }
@@ -85,7 +88,8 @@ usage() {
 # Outputs: KEY=VALUE lines suitable for eval or sourcing.
 
 parse_frontmatter() {
-	local file="$1"
+	local file
+	file="$1"
 	local in_frontmatter=0
 	local line_num=0
 
@@ -150,7 +154,8 @@ parse_frontmatter() {
 
 # Extract rule body (everything after frontmatter closing ---)
 extract_body() {
-	local file="$1"
+	local file
+	file="$1"
 	local in_frontmatter=0
 	local past_frontmatter=0
 	local line_num=0
@@ -182,7 +187,8 @@ extract_body() {
 # Discover all rule files in the rules directory.
 # Returns one file path per line. Excludes README.md.
 discover_rules() {
-	local rules_dir="$1"
+	local rules_dir
+	rules_dir="$1"
 
 	if [[ ! -d "$rules_dir" ]]; then
 		log_error "Rules directory not found: $rules_dir"
@@ -211,7 +217,8 @@ discover_rules() {
 # Sets: rule_id, rule_trigger, rule_severity, rule_repeat_policy,
 #       rule_gap_turns, rule_tags, rule_enabled, rule_body
 load_rule() {
-	local file="$1"
+	local file
+	file="$1"
 
 	# Reset rule variables
 	rule_id=""
@@ -263,8 +270,10 @@ load_rule() {
 # State file format: one line per rule: "rule_id:last_fired_turn"
 
 get_last_fired() {
-	local rule_id="$1"
-	local state_file="$2"
+	local rule_id
+	rule_id="$1"
+	local state_file
+	state_file="$2"
 
 	if [[ ! -f "$state_file" ]]; then
 		printf ''
@@ -272,15 +281,18 @@ get_last_fired() {
 	fi
 
 	local result
-	result="$(grep "^${rule_id}:" "$state_file" 2>/dev/null | tail -1 | cut -d: -f2)" || true
+	result="$(grep "^${rule_id}:" "$state_file" | tail -1 | cut -d: -f2)" || true
 	printf '%s' "$result"
 	return 0
 }
 
 record_fired() {
-	local rule_id="$1"
-	local turn="$2"
-	local state_file="$3"
+	local rule_id
+	rule_id="$1"
+	local turn
+	turn="$2"
+	local state_file
+	state_file="$3"
 
 	# Ensure state file directory exists
 	local state_dir
@@ -289,7 +301,7 @@ record_fired() {
 
 	# Remove old entry for this rule, append new
 	if [[ -f "$state_file" ]]; then
-		grep -v "^${rule_id}:" "$state_file" >"${state_file}.tmp" 2>/dev/null || true
+		grep -v "^${rule_id}:" "$state_file" >"${state_file}.tmp" || true
 	else
 		: >"${state_file}.tmp"
 	fi
@@ -301,11 +313,16 @@ record_fired() {
 
 # Check if a rule should fire given its repeat policy and state
 should_fire() {
-	local rule_id="$1"
-	local repeat_policy="$2"
-	local gap_turns="$3"
-	local current_turn="$4"
-	local state_file="$5"
+	local rule_id
+	rule_id="$1"
+	local repeat_policy
+	repeat_policy="$2"
+	local gap_turns
+	gap_turns="$3"
+	local current_turn
+	current_turn="$4"
+	local state_file
+	state_file="$5"
 
 	local last_fired
 	last_fired="$(get_last_fired "$rule_id" "$state_file")"
@@ -338,8 +355,10 @@ should_fire() {
 # =============================================================================
 
 cmd_list() {
-	local rules_dir="$1"
-	local format="$2"
+	local rules_dir
+	rules_dir="$1"
+	local format
+	format="$2"
 
 	local rule_files
 	rule_files="$(discover_rules "$rules_dir")" || return 1
@@ -395,11 +414,16 @@ cmd_list() {
 }
 
 cmd_check() {
-	local output_text="$1"
-	local rules_dir="$2"
-	local state_file="$3"
-	local current_turn="$4"
-	local format="$5"
+	local output_text
+	output_text="$1"
+	local rules_dir
+	rules_dir="$2"
+	local state_file
+	state_file="$3"
+	local current_turn
+	current_turn="$4"
+	local format
+	format="$5"
 
 	local rule_files
 	rule_files="$(discover_rules "$rules_dir")" || return 1
@@ -424,7 +448,7 @@ cmd_check() {
 		fi
 
 		# Check if trigger matches the output text
-		if printf '%s' "$output_text" | grep -qE "$rule_trigger" 2>/dev/null; then
+		if printf '%s' "$output_text" | grep -qE "$rule_trigger"; then
 			# Check repeat policy
 			if should_fire "$rule_id" "$rule_repeat_policy" "$rule_gap_turns" "$current_turn" "$state_file"; then
 				# Record firing
@@ -433,23 +457,18 @@ cmd_check() {
 				matched=$((matched + 1))
 
 				if [[ "$format" == "json" ]]; then
+					local json_correction
+					json_correction="$(jq -n \
+						--arg id "$rule_id" \
+						--arg severity "$rule_severity" \
+						--arg body "$rule_body" \
+						'{id: $id, severity: $severity, body: $body}')"
+
 					if [[ "$matched" -eq 1 ]]; then
-						corrections='['
+						corrections="[${json_correction}"
 					else
-						corrections="${corrections},"
+						corrections="${corrections},${json_correction}"
 					fi
-					# Escape body for JSON (backslashes, quotes, newlines)
-					local escaped_body
-					escaped_body="$(printf '%s' "$rule_body" | awk '
-					BEGIN { ORS="" }
-					{
-						gsub(/\\/, "\\\\")
-						gsub(/"/, "\\\"")
-						if (NR > 1) printf "\\n"
-						printf "%s", $0
-					}
-				')"
-					corrections="${corrections}{\"id\":\"${rule_id}\",\"severity\":\"${rule_severity}\",\"body\":\"${escaped_body}\"}"
 				else
 					local severity_upper
 					severity_upper="$(printf '%s' "$rule_severity" | tr '[:lower:]' '[:upper:]')"
@@ -474,7 +493,8 @@ cmd_check() {
 }
 
 cmd_reset() {
-	local state_file="$1"
+	local state_file
+	state_file="$1"
 
 	if [[ -f "$state_file" ]]; then
 		rm -f "$state_file"
@@ -487,8 +507,10 @@ cmd_reset() {
 }
 
 cmd_show() {
-	local target_id="$1"
-	local rules_dir="$2"
+	local target_id
+	target_id="$1"
+	local rules_dir
+	rules_dir="$2"
 
 	local rule_files
 	rule_files="$(discover_rules "$rules_dir")" || return 1
@@ -555,6 +577,10 @@ main() {
 				log_error "--turn requires a value"
 				usage
 			}
+			if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+				log_error "--turn must be a non-negative integer"
+				usage
+			fi
 			current_turn="$2"
 			shift 2
 			;;
