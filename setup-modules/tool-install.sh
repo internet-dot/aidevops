@@ -116,16 +116,8 @@ setup_file_discovery_tools() {
 		missing_names+=("fd (fast file finder)")
 	fi
 
-	# Check for ripgrep
-	if ! command -v rg >/dev/null 2>&1; then
-		missing_tools+=("rg")
-		missing_packages+=("ripgrep")
-		missing_names+=("ripgrep (fast content search)")
-	else
-		local rg_version
-		rg_version=$(rg --version 2>/dev/null | head -1 || echo "unknown")
-		print_success "ripgrep found: $rg_version"
-	fi
+	# Note: ripgrep (rg) is a required dependency installed by check_requirements().
+	# It is not checked here to avoid redundancy.
 
 	# Check for ripgrep-all (searches inside PDFs, DOCX, SQLite, archives)
 	if ! command -v rga >/dev/null 2>&1; then
@@ -144,7 +136,6 @@ setup_file_discovery_tools() {
 		echo ""
 		echo "  These tools provide 10x faster file discovery than built-in glob:"
 		echo "    fd          - Fast alternative to 'find', respects .gitignore"
-		echo "    ripgrep     - Fast alternative to 'grep', respects .gitignore"
 		echo "    ripgrep-all - Extends ripgrep to search inside PDFs, DOCX, SQLite, archives"
 		echo ""
 		echo "  AI agents use these for efficient codebase navigation."
