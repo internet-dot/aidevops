@@ -456,6 +456,87 @@ _check_and_skip_if_blocked() {
 }
 
 #######################################
+# Shared pre-pickup guard for auto-dispatch strategies.
+# Runs the standard sequence of skip checks and returns 0 (skip) or 1 (proceed).
+# On return 0, the caller should `continue` to the next task.
+# Blocked tasks are registered in the supervisor DB so they become visible
+# for dispatch when their blockers resolve.
+#
+# Args:
+#   $1 - task line from TODO.md
+#   $2 - task_id (e.g. t003 or t003.2)
+#   $3 - todo_file path
+#   $4 - repo path
+#   $5 - check_needed_blockers: "true" to also check -needed blocker tags (Strategies 1 & 2)
+#
+# Guard sequence:
+#   1. assignee:/started: metadata fields → skip (already claimed/in-progress)
+#   2. blocked-by: dependencies → register + skip
+#   3. -needed blocker tags (if $5 == "true") → register + skip
+#   4. Supervisor DB lookup → skip if terminal or already tracked
+#   5. Cross-repo misregistration guard
+#   6. Merged-PR pre-check
+#
+# Returns: 0 = skip this task, 1 = proceed with pickup
+#######################################
+_should_skip_task() {
+	local line="$1"
+	local task_id="$2"
+	local todo_file="$3"
+	local repo="$4"
+	local check_needed_blockers="${5:-true}"
+
+	# Guard 1: already claimed or in progress
+	if echo "$line" | grep -qE '(assignee:[a-zA-Z0-9_-]+|started:[0-9]{4}-[0-9]{2}-[0-9]{2}T)'; then
+		log_info "  $task_id: already claimed or in progress — skipping auto-pickup"
+		return 0
+	fi
+
+	# Guard 2: unresolved blocked-by dependencies
+	if _check_and_skip_if_blocked "$line" "$task_id" "$todo_file"; then
+		local unresolved
+		unresolved=$(is_task_blocked "$line" "$todo_file" || true)
+		_register_blocked_task "$task_id" "$repo" "$unresolved"
+		return 0
+	fi
+
+	# Guard 3: -needed blocker tags (human action required)
+	if [[ "$check_needed_blockers" == "true" ]]; then
+		if echo "$line" | grep -qE '(account|hosting|login|api-key|clarification|resources|payment|approval|decision|design|content|dns|domain|testing)-needed'; then
+			local blocker_tag
+			blocker_tag=$(echo "$line" | grep -oE '(account|hosting|login|api-key|clarification|resources|payment|approval|decision|design|content|dns|domain|testing)-needed' | head -1)
+			log_info "  $task_id: blocked by $blocker_tag (human action required) — skipping auto-pickup"
+			_register_blocked_task "$task_id" "$repo" "$blocker_tag"
+			return 0
+		fi
+	fi
+
+	# Guard 4: supervisor DB lookup
+	local existing
+	existing=$(db "$SUPERVISOR_DB" "SELECT status FROM tasks WHERE id = '$(sql_escape "$task_id")';" 2>/dev/null || true)
+	if [[ -n "$existing" ]]; then
+		if [[ "$existing" == "complete" || "$existing" == "cancelled" || "$existing" == "verified" ]]; then
+			return 0
+		fi
+		log_info "  $task_id: already tracked (status: $existing)"
+		return 0
+	fi
+
+	# Guard 5: cross-repo misregistration
+	if _is_cross_repo_misregistration "$task_id" "$repo"; then
+		return 0
+	fi
+
+	# Guard 6: merged-PR pre-check
+	if check_task_already_done "$task_id" "$repo"; then
+		log_info "  $task_id: already completed (merged PR) — skipping auto-pickup"
+		return 0
+	fi
+
+	return 1
+}
+
+#######################################
 # Register a task as blocked in the supervisor DB.
 # Creates the task via cmd_add if not already tracked, then
 # sets status='blocked' with the blocker reason in the error field.
@@ -602,63 +683,8 @@ cmd_auto_pickup() {
 				continue
 			fi
 
-			# Skip tasks with assignee: or started: metadata fields (t1062, t1263)
-			# Match actual metadata fields, not description text containing these words.
-			# assignee: must be followed by a username (word chars), started: by ISO timestamp.
-			if echo "$line" | grep -qE '(assignee:[a-zA-Z0-9_-]+|started:[0-9]{4}-[0-9]{2}-[0-9]{2}T)'; then
-				log_info "  $task_id: already claimed or in progress — skipping auto-pickup"
-				continue
-			fi
-
-			# Register blocked tasks in DB instead of skipping entirely.
-			# This makes blocked tasks visible to the supervisor so they
-			# can be dispatched immediately when blockers resolve.
-
-			# Skip tasks with unresolved blocked-by dependencies (t1085.4)
-			if _check_and_skip_if_blocked "$line" "$task_id" "$todo_file"; then
-				local unresolved
-				unresolved=$(is_task_blocked "$line" "$todo_file" || true)
-				_register_blocked_task "$task_id" "$repo" "$unresolved"
-				continue
-			fi
-
-			# Skip tasks with -needed blocker tags (t1287) — human action required
-			if echo "$line" | grep -qE '(account|hosting|login|api-key|clarification|resources|payment|approval|decision|design|content|dns|domain|testing)-needed'; then
-				local blocker_tag
-				blocker_tag=$(echo "$line" | grep -oE '(account|hosting|login|api-key|clarification|resources|payment|approval|decision|design|content|dns|domain|testing)-needed' | head -1)
-				log_info "  $task_id: blocked by $blocker_tag (human action required) — skipping auto-pickup"
-				_register_blocked_task "$task_id" "$repo" "$blocker_tag"
-				continue
-			fi
-
-			# Check if already in supervisor
-			local existing
-			existing=$(db "$SUPERVISOR_DB" "SELECT status FROM tasks WHERE id = '$(sql_escape "$task_id")';" 2>/dev/null || true)
-			if [[ -n "$existing" ]]; then
-				if [[ "$existing" == "complete" || "$existing" == "cancelled" || "$existing" == "verified" ]]; then
-					continue
-				fi
-				log_info "  $task_id: already tracked (status: $existing)"
-				continue
-			fi
-
-			# t1239: Cross-repo misregistration guard — skip if task is registered to a different repo
-			if _is_cross_repo_misregistration "$task_id" "$repo"; then
-				continue
-			fi
-
-			# Pre-pickup check: skip tasks with merged PRs (t224).
-			# cmd_add also checks, but checking here provides better logging.
-			if check_task_already_done "$task_id" "$repo"; then
-				log_info "  $task_id: already completed (merged PR) — skipping auto-pickup"
-				continue
-			fi
-
-			# Skip tasks already claimed or being worked on interactively (t1062).
-			# assignee: means someone claimed it; started: means work has begun.
-			# Without this check, the supervisor races with interactive sessions.
-			if echo "$line" | grep -qE ' (assignee|started):'; then
-				log_info "  $task_id: already claimed/started — skipping auto-pickup"
+			# Run shared pre-pickup guards (assignee, blocked-by, -needed, DB, cross-repo, merged-PR)
+			if _should_skip_task "$line" "$task_id" "$todo_file" "$repo" "true"; then
 				continue
 			fi
 
@@ -703,56 +729,8 @@ cmd_auto_pickup() {
 				continue
 			fi
 
-			# Skip tasks with assignee: or started: metadata fields (t1062, t1263)
-			# Match actual metadata fields, not description text containing these words.
-			# assignee: must be followed by a username (word chars), started: by ISO timestamp.
-			if echo "$line" | grep -qE '(assignee:[a-zA-Z0-9_-]+|started:[0-9]{4}-[0-9]{2}-[0-9]{2}T)'; then
-				log_info "  $task_id: already claimed or in progress — skipping auto-pickup"
-				continue
-			fi
-
-			# Register blocked tasks in DB instead of skipping entirely.
-			# Skip tasks with unresolved blocked-by dependencies (t1085.4)
-			if _check_and_skip_if_blocked "$line" "$task_id" "$todo_file"; then
-				local unresolved
-				unresolved=$(is_task_blocked "$line" "$todo_file" || true)
-				_register_blocked_task "$task_id" "$repo" "$unresolved"
-				continue
-			fi
-
-			# Skip tasks with -needed blocker tags (t1287) — human action required
-			if echo "$line" | grep -qE '(account|hosting|login|api-key|clarification|resources|payment|approval|decision|design|content|dns|domain|testing)-needed'; then
-				local blocker_tag
-				blocker_tag=$(echo "$line" | grep -oE '(account|hosting|login|api-key|clarification|resources|payment|approval|decision|design|content|dns|domain|testing)-needed' | head -1)
-				log_info "  $task_id: blocked by $blocker_tag (human action required) — skipping auto-pickup"
-				_register_blocked_task "$task_id" "$repo" "$blocker_tag"
-				continue
-			fi
-
-			local existing
-			existing=$(db "$SUPERVISOR_DB" "SELECT status FROM tasks WHERE id = '$(sql_escape "$task_id")';" 2>/dev/null || true)
-			if [[ -n "$existing" ]]; then
-				if [[ "$existing" == "complete" || "$existing" == "cancelled" || "$existing" == "verified" ]]; then
-					continue
-				fi
-				log_info "  $task_id: already tracked (status: $existing)"
-				continue
-			fi
-
-			# t1239: Cross-repo misregistration guard — skip if task is registered to a different repo
-			if _is_cross_repo_misregistration "$task_id" "$repo"; then
-				continue
-			fi
-
-			# Pre-pickup check: skip tasks with merged PRs (t224).
-			if check_task_already_done "$task_id" "$repo"; then
-				log_info "  $task_id: already completed (merged PR) — skipping auto-pickup"
-				continue
-			fi
-
-			# Skip tasks already claimed or being worked on interactively (t1062).
-			if echo "$line" | grep -qE ' (assignee|started):'; then
-				log_info "  $task_id: already claimed/started — skipping auto-pickup"
+			# Run shared pre-pickup guards (assignee, blocked-by, -needed, DB, cross-repo, merged-PR)
+			if _should_skip_task "$line" "$task_id" "$todo_file" "$repo" "true"; then
 				continue
 			fi
 
@@ -837,9 +815,11 @@ cmd_auto_pickup() {
 	# Step 1: Collect OPEN parent task IDs that have #auto-dispatch (t1276)
 	# Only open parents ([ ]) — completed parents' subtasks are irrelevant.
 	# Previous head -50 limit caused parents beyond the 50th to be silently skipped.
+	# Extract only the leading task ID (first tNNN after the checklist prefix) to avoid
+	# picking up task IDs embedded in descriptions (e.g. blocked-by:t1234, see t999).
 	local parent_ids
 	parent_ids=$(grep -E '^[[:space:]]*- \[ \] (t[0-9]+) .*#auto-dispatch' "$todo_file" 2>/dev/null |
-		grep -oE 't[0-9]+' | sort -u || true)
+		sed -E 's/^[[:space:]]*- \[[ ]\] (t[0-9]+).*/\1/' | sort -u || true)
 
 	if [[ -n "$parent_ids" ]]; then
 		while IFS= read -r parent_id; do
@@ -873,39 +853,9 @@ cmd_auto_pickup() {
 					continue
 				fi
 
-				# Skip tasks with assignee: or started: metadata fields (t1263)
-				if echo "$sub_line" | grep -qE '(assignee:[a-zA-Z0-9_-]+|started:[0-9]{4}-[0-9]{2}-[0-9]{2}T)'; then
-					log_info "  $sub_id: already claimed or in progress — skipping subtask pickup"
-					continue
-				fi
-
-				# Register blocked subtasks in DB instead of skipping entirely
-				if _check_and_skip_if_blocked "$sub_line" "$sub_id" "$todo_file"; then
-					local unresolved
-					unresolved=$(is_task_blocked "$sub_line" "$todo_file" || true)
-					_register_blocked_task "$sub_id" "$repo" "$unresolved"
-					continue
-				fi
-
-				# Check if already in supervisor
-				local existing
-				existing=$(db "$SUPERVISOR_DB" "SELECT status FROM tasks WHERE id = '$(sql_escape "$sub_id")';" 2>/dev/null || true)
-				if [[ -n "$existing" ]]; then
-					if [[ "$existing" == "complete" || "$existing" == "cancelled" ]]; then
-						continue
-					fi
-					log_info "  $sub_id: already tracked (status: $existing)"
-					continue
-				fi
-
-				# t1239: Cross-repo misregistration guard — skip if subtask is registered to a different repo
-				if _is_cross_repo_misregistration "$sub_id" "$repo"; then
-					continue
-				fi
-
-				# Pre-pickup check: skip tasks with merged PRs
-				if check_task_already_done "$sub_id" "$repo"; then
-					log_info "  $sub_id: already completed (merged PR) — skipping subtask pickup"
+				# Run shared pre-pickup guards (assignee, blocked-by, DB, cross-repo, merged-PR)
+				# No -needed blocker check for subtasks — parent already passed that gate
+				if _should_skip_task "$sub_line" "$sub_id" "$todo_file" "$repo" "false"; then
 					continue
 				fi
 
