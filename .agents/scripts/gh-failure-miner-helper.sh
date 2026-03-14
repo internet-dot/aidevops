@@ -161,6 +161,7 @@ extract_failure_signature() {
 fetch_notifications_json() {
 	local since_iso="$1"
 	local limit="$2"
+	# NOSONAR - $limit is validated as [0-9]+ before call; $since_iso is output of date(1) in ISO format
 	gh api "notifications?all=true&participating=false&per_page=${limit}&since=${since_iso}"
 	return 0
 }
