@@ -674,6 +674,7 @@ submit_specialized() {
 	payload=$(echo "${extra_payload}" | jq --arg url "${image_url}" '. + {image_url: $url}')
 
 	submit_and_poll "${endpoint}" "${payload}" "${poll_interval}" "${timeout}" "${output_file}" "${webhook}"
+	return $?
 }
 
 # Face swap (image or video)
@@ -1180,7 +1181,7 @@ cmd_balance() {
 	local response
 	response=$(api_request GET "${MUAPI_BASE}/payments/credits")
 
-	echo "${response}" | jq . 2>/dev/null || echo "${response}"
+	echo "${response}" | jq . || echo "${response}"
 	return 0
 }
 
@@ -1191,7 +1192,7 @@ cmd_usage() {
 	local response
 	response=$(api_request GET "${MUAPI_BASE}/payments/usage")
 
-	echo "${response}" | jq . 2>/dev/null || echo "${response}"
+	echo "${response}" | jq . || echo "${response}"
 	return 0
 }
 
