@@ -39,7 +39,10 @@
 #   where launchd fires between rm -f and the next write, which caused the
 #   82-concurrent-pulse incident (2026-03-13T02:06:01Z, issue #4318).
 #
-# Called by launchd every 120s via the supervisor-pulse plist.
+# Called by cron (Linux) or launchd (macOS) every 120s.
+# GH#4513: The cron/launchd entry now runs this script directly from the
+# repo (not the deployed copy at ~/.aidevops/agents/scripts/), so fixes
+# are effective immediately after merge without needing setup.sh.
 
 set -euo pipefail
 

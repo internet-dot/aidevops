@@ -857,11 +857,19 @@ main() {
 	#   - Consent persisted: written to config.jsonc so it survives updates
 	#   - Never silently re-enabled: if config says false, skip entirely
 	#   - Non-interactive: only installs if config explicitly says true
-	local wrapper_script="$HOME/.aidevops/agents/scripts/pulse-wrapper.sh"
+	#
 	local pulse_label="com.aidevops.aidevops-supervisor-pulse"
 	local _aidevops_dir _pulse_repo_dir
 	_aidevops_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 	_pulse_repo_dir=$(_resolve_main_worktree_dir "$_aidevops_dir")
+	# GH#4513: Use the repo version of pulse-wrapper.sh directly instead of
+	# the deployed copy at ~/.aidevops/agents/scripts/. The canonical repo
+	# directory is always on main (worktree-first workflow), so the repo
+	# version is always the latest merged code. This eliminates the
+	# deployment gap where fixes are merged but not deployed until the next
+	# setup.sh run — which caused 6 concurrent pulse sessions (GH#4513)
+	# because the flock guard (GH#4409) was merged but not deployed.
+	local wrapper_script="${_pulse_repo_dir}/.agents/scripts/pulse-wrapper.sh"
 
 	# Read explicit user consent from config.jsonc (not merged defaults).
 	# Empty = user never configured this; "true"/"false" = explicit choice.
@@ -930,9 +938,9 @@ main() {
 		fi
 	fi
 
-	# Guard: wrapper must exist
+	# Guard: wrapper must exist in the repo
 	if [[ "$_do_install" == "true" && ! -f "$wrapper_script" ]]; then
-		# Wrapper not deployed yet — skip (will install on next run after rsync)
+		# Wrapper not found in repo — skip (repo may be in a broken state)
 		_do_install=false
 	fi
 
