@@ -148,6 +148,14 @@ Concrete model subagents are defined across these paths (`tools/ai-assistants/mo
 
 Cross-provider reviewers: `models/gemini-reviewer.md`, `models/gpt-reviewer.md`
 
+## Headless Dispatch Model Constraints
+
+The pulse supervisor and headless workers have different model requirements:
+
+- **Pulse supervisor**: Anthropic sonnet only. OpenAI models are unreliable for orchestration — they exit immediately without producing model activity, wasting the entire pulse cycle. This is a proven failure mode, not a preference. Set via `AIDEVOPS_HEADLESS_MODELS=anthropic/claude-sonnet-4-6` in `~/.config/aidevops/credentials.sh`.
+- **Workers**: Can use any configured provider. The headless runtime helper rotates between providers in `AIDEVOPS_HEADLESS_MODELS`. For worker-only multi-provider rotation, configure the env var with multiple models but ensure the pulse plist only has anthropic.
+- **Default** (no env var set): `anthropic/claude-sonnet-4-6` (single provider, no rotation).
+
 ## Integration with Task Tool
 
 When using the Task tool to dispatch subagents, the `model:` field in the subagent's frontmatter serves as a recommendation. The orchestrating agent can override based on task complexity.
