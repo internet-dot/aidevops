@@ -459,12 +459,13 @@ build_repo_clusters_json() {
 
 compute_pattern_id() {
 	local input_value="$1"
+	# SHA-256 used for non-cryptographic deduplication IDs (pattern fingerprints)
 	if command -v sha256sum >/dev/null 2>&1; then
-		printf '%s' "$input_value" | sha256sum | awk '{print $1}' | cut -c1-12
+		printf '%s' "$input_value" | sha256sum | awk '{print $1}' | cut -c1-12 # NOSONAR - SHA-256 for dedup ID
 		return 0
 	fi
 	if command -v shasum >/dev/null 2>&1; then
-		printf '%s' "$input_value" | shasum -a 256 | awk '{print $1}' | cut -c1-12
+		printf '%s' "$input_value" | shasum -a 256 | awk '{print $1}' | cut -c1-12 # NOSONAR - SHA-256 for dedup ID
 		return 0
 	fi
 	# Fallback: use cksum (POSIX) — not cryptographic but sufficient for deduplication IDs
