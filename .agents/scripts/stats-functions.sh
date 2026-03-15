@@ -1100,6 +1100,14 @@ _create_simplification_issues() {
 	local min_smells_threshold=5
 	local issues_created=0
 
+	# Ensure required labels exist (gh issue create fails if labels are missing)
+	gh label create "simplification-debt" --repo "$repo_slug" \
+		--description "Code simplification opportunity (human-gated via code-simplifier)" \
+		--color "C5DEF5" 2>/dev/null || true
+	gh label create "needs-maintainer-review" --repo "$repo_slug" \
+		--description "Requires maintainer approval before automated dispatch" \
+		--color "FBCA04" 2>/dev/null || true
+
 	# Extract files with smell count > threshold, sorted by count descending
 	local high_smell_files
 	high_smell_files=$(echo "$sarif_json" | jq -r --argjson threshold "$min_smells_threshold" '
