@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-03-15
+
+### Added
+
+- model-level backoff in headless-runtime-helper.sh (#4927)
+- bridge daily quality sweep to code-simplifier pipeline (t1490)
+
+### Changed
+
+- Maintenance: mark t1485 complete (pr:#4923 completed:2026-03-15) [skip ci]
+- Documentation: add Knowledge Graph Routing pattern to agent design patterns
+- Documentation: add TOON token-efficient serialisation to agent design patterns
+- Documentation: refine founder tagline wording
+- Documentation: add Open-Source to founder tagline
+- Documentation: use 'Founded' instead of 'Created' for ongoing project
+- Documentation: add creation date and author attribution to README
+- Documentation: remove Windows Terminal from supported terminals list
+- Maintenance: mark t1489 complete (pr:#4918 completed:2026-03-15) [skip ci]
+- Documentation: audit README — update stale counts, add OpenCode+Claude positioning (#4922)
+- Maintenance: mark t1488 complete (pr:#4919 completed:2026-03-15) [skip ci]
+- Refactor: split seo-content-analyzer.py into focused modules (t1488) (#4919)
+- Maintenance: mark t1487 complete (pr:#4914 completed:2026-03-15) [skip ci]
+- Maintenance: mark t1486 complete (pr:#4915 completed:2026-03-15) [skip ci]
+- Performance: tune worker RAM allocation — 512MB per worker, 6GB reserve (was 1GB/8GB)
+- Maintenance: claim t1490
+- Maintenance: add Codacy quality gate adjustment task (t1489)
+- Maintenance: claim t1489
+- Maintenance: claim t1488
+- Maintenance: add module-split tasks for top 4 file-complexity smells (t1485-t1488)
+- Maintenance: claim t1487
+- Maintenance: claim t1486
+- Maintenance: claim t1485
+- Refactor: reduce Qlty smells in playwright-automator.mjs (batch 3c)
+- Refactor: reduce Qlty maintainability smells (batch3c)
+- Maintenance: claim t1484
+- Refactor: reduce Qlty maintainability smells in OpenCode TS files (batch 3b)
+- Refactor: reduce Qlty maintainability smells in Python scripts (batch 3a)
+- Refactor: reduce Qlty maintainability smells in Python/JS scripts (batch 3a)
+
+### Fixed
+
+- correct tmux to cmux in supported terminals list
+- add blank line between tagline quote and subtitle (#4924)
+- tagline paragraph break and website badge globe icon (#4921)
+- make pulse-wrapper.sh source-safe in zsh/supervisor sessions (GH#4904) (#4920)
+- auto-assign issues on creation to prevent duplicate dispatch
+- ensure simplification-debt labels exist before issue creation
+- add comma thousands separators to token counts (e.g., 10,425.3M) (#4911)
+- split footer text into separate paragraphs for readability (#4909)
+
 ## [2.173.0] - 2026-03-14
 
 ### Added
