@@ -3,7 +3,8 @@
 #
 # Sources activity data exclusively from immutable git commit history to prevent
 # manipulation. Each contributor's activity is measured by commits, active days,
-# and commit type (direct vs PR merges).
+# and commit type (direct vs PR merges). Only default-branch commits are counted
+# to avoid double-counting squash-merged PR commits (branch originals + merge).
 #
 # Commit type detection uses the committer email field:
 #   - committer=noreply@github.com → GitHub squash-merged a PR (automated output)
@@ -74,6 +75,43 @@ def is_pr_merge(committer_email):
 '
 
 #######################################
+# Resolve the default branch for a repo
+#
+# Tries origin/HEAD first (set by clone), falls back to checking for
+# main/master branches. Works correctly from worktrees on non-default
+# branches, which is critical since this script is called from headless
+# workers and worktrees.
+#
+# Arguments:
+#   $1 - repo path
+# Output: default branch name (e.g., "main") to stdout
+#######################################
+_resolve_default_branch() {
+	local repo_path="$1"
+	local default_branch=""
+
+	# Try origin/HEAD (most reliable — set by git clone)
+	default_branch=$(git -C "$repo_path" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@') || default_branch=""
+
+	# Fallback: check for common default branch names
+	if [[ -z "$default_branch" ]]; then
+		if git -C "$repo_path" rev-parse --verify main >/dev/null 2>&1; then
+			default_branch="main"
+		elif git -C "$repo_path" rev-parse --verify master >/dev/null 2>&1; then
+			default_branch="master"
+		fi
+	fi
+
+	# Last resort: use HEAD (current branch — may be wrong in worktrees)
+	if [[ -z "$default_branch" ]]; then
+		default_branch="HEAD"
+	fi
+
+	echo "$default_branch"
+	return 0
+}
+
+#######################################
 # Compute activity summary for all contributors in a repo
 #
 # Reads git log and computes per-contributor stats:
@@ -122,12 +160,16 @@ compute_activity() {
 	esac
 
 	# Get git log: author_email|committer_email|ISO-date (one line per commit)
-	# The committer email distinguishes PR merges from direct commits:
-	#   noreply@github.com = GitHub squash-merged a PR
+	# Explicit default branch (no --all) to avoid double-counting squash-merged PRs.
+	# With --all, branch commits AND their squash-merge on main are both counted,
+	# inflating totals by ~12%. The committer email distinguishes commit types:
+	#   noreply@github.com = GitHub squash-merged a PR (author created the PR)
 	#   author's own email = direct push
+	local default_branch
+	default_branch=$(_resolve_default_branch "$repo_path")
 	local git_data
 	# shellcheck disable=SC2086
-	git_data=$(git -C "$repo_path" log --all --format='%ae|%ce|%aI' $since_arg) || git_data=""
+	git_data=$(git -C "$repo_path" log "$default_branch" --format='%ae|%ce|%aI' $since_arg) || git_data=""
 
 	if [[ -z "$git_data" ]]; then
 		if [[ "$format" == "json" ]]; then
@@ -214,7 +256,7 @@ else:
     if not results:
         print(f'_No contributor activity in the last {period_name}._')
     else:
-        print('| Contributor | Direct | PR Merges | Total | Active Days | Avg/Day |')
+        print('| Contributor | Direct Pushes | PRs Merged | Total Commits | Active Days | Avg/Day |')
         print('| --- | ---: | ---: | ---: | ---: | ---: |')
         for r in results:
             print(f'| {r[\"login\"]} | {r[\"direct_commits\"]} | {r[\"pr_merges\"]} | {r[\"total_commits\"]} | {r[\"active_days\"]} | {r[\"avg_commits_per_day\"]} |')
@@ -240,9 +282,11 @@ user_activity() {
 		return 1
 	fi
 
-	# Get all commits with author + committer emails
+	# Get default-branch commits with author + committer emails
+	local default_branch
+	default_branch=$(_resolve_default_branch "$repo_path")
 	local git_data
-	git_data=$(git -C "$repo_path" log --all --format='%ae|%ce|%aI' --since='1.year.ago') || git_data=""
+	git_data=$(git -C "$repo_path" log "$default_branch" --format='%ae|%ce|%aI' --since='1.year.ago') || git_data=""
 
 	# Target login passed via sys.argv to avoid shell injection.
 	echo "$git_data" | python3 -c "
@@ -433,7 +477,7 @@ else:
     else:
         print(f'_Across {repo_count} managed repos:_')
         print()
-        print('| Contributor | Direct | PR Merges | Total | Active Days | Repos | Avg/Day |')
+        print('| Contributor | Direct Pushes | PRs Merged | Total Commits | Active Days | Repos | Avg/Day |')
         print('| --- | ---: | ---: | ---: | ---: | ---: | ---: |')
         for r in results:
             print(f'| {r[\"login\"]} | {r[\"direct_commits\"]} | {r[\"pr_merges\"]} | {r[\"total_commits\"]} | {r[\"active_days\"]} | {r[\"repos_active\"]} | {r[\"avg_commits_per_day\"]} |')
@@ -1002,10 +1046,12 @@ person_stats() {
 	if [[ -n "$logins_override" ]]; then
 		logins_csv="$logins_override"
 	else
-		# Extract unique non-bot logins from git history using the same
-		# noreply email mapping as compute_activity
+		# Extract unique non-bot logins from default-branch git history
+		# using the same noreply email mapping as compute_activity
+		local default_branch
+		default_branch=$(_resolve_default_branch "$repo_path")
 		local git_data
-		git_data=$(git -C "$repo_path" log --all --format='%ae|%ce' --since="$since_date") || git_data=""
+		git_data=$(git -C "$repo_path" log "$default_branch" --format='%ae|%ce' --since="$since_date") || git_data=""
 		logins_csv=$(echo "$git_data" | python3 -c "
 import sys
 
@@ -1329,14 +1375,16 @@ main() {
 		echo "  person-stats <repo-path> [--period day|week|month|quarter|year] [--format markdown|json] [--logins a,b]"
 		echo "  cross-repo-person-stats <path1> [path2 ...] [--period month] [--format markdown|json] [--logins a,b]"
 		echo ""
-		echo "Computes contributor activity from immutable git commit history."
+		echo "Computes contributor commit activity from default-branch git history."
+		echo "Only default-branch commits are counted (no --all) to avoid"
+		echo "double-counting squash-merged PR commits."
 		echo "Session time stats from AI assistant database (OpenCode/Claude Code)."
 		echo "Per-person GitHub output stats from GitHub Search API."
 		echo "GitHub noreply emails are used to normalise author names to logins."
 		echo ""
 		echo "Commit types:"
-		echo "  Direct  - committer is the author (push, CLI commit)"
-		echo "  PR Merge - committer is noreply@github.com (GitHub squash-merge)"
+		echo "  Direct Pushes - committer is the author (push, CLI commit)"
+		echo "  PRs Merged    - committer is noreply@github.com (GitHub squash-merge)"
 		echo ""
 		echo "Session time (human vs machine):"
 		echo "  Human hours   - time spent reading, thinking, typing (between AI responses)"
