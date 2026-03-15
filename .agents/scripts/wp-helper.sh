@@ -380,7 +380,7 @@ run_wp_command() {
 	local site_type
 	site_type=$(echo "$site_config" | jq -r '.type')
 
-	print_info "Running on $site_name ($site_type): wp ${wp_args[*]}" >&2
+	print_info "Running on $site_name ($site_type): wp $(printf '%q ' "${wp_args[@]}")" >&2
 
 	# Execute directly without eval
 	execute_wp_via_ssh "$site_config" "${wp_args[@]}"
