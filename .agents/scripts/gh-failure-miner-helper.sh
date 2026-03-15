@@ -17,6 +17,7 @@ readonly DEFAULT_REPOS_JSON="${HOME}/.config/aidevops/repos.json"
 readonly DEFAULT_ROUTINE_NAME="gh-failure-miner"
 readonly DEFAULT_ROUTINE_SCHEDULE="15 * * * *"
 readonly DEFAULT_ROUTINE_TITLE="GH failed notifications: systemic triage"
+readonly JQ_COUNT='length'
 
 print_usage() {
 	cat <<'EOF'
@@ -213,7 +214,7 @@ extract_failed_events_json() {
 	ci_threads_json=$(printf '%s\n' "$notifications_json" | jq '[.[] | select((.subject.url // "") as $u | (($u | test("/pulls/")) or ($include_push and ($u | test("/commits/")))))]' --argjson include_push "$include_push_events")
 
 	local thread_count
-	thread_count=$(printf '%s\n' "$ci_threads_json" | jq 'length')
+	thread_count=$(printf '%s\n' "$ci_threads_json" | jq "$JQ_COUNT")
 
 	local event_file
 	event_file=$(mktemp)
@@ -298,7 +299,7 @@ extract_failed_events_json() {
 		)]')
 
 		local failed_count
-		failed_count=$(printf '%s\n' "$failed_runs_json" | jq 'length')
+		failed_count=$(printf '%s\n' "$failed_runs_json" | jq "$JQ_COUNT")
 		local failed_index=0
 		while [[ "$failed_index" -lt "$failed_count" ]]; do
 			local run_json
@@ -553,7 +554,7 @@ create_systemic_issues() {
 	fi
 
 	local candidate_count
-	candidate_count=$(jq 'length' "$candidate_file")
+	candidate_count=$(jq "$JQ_COUNT" "$candidate_file")
 	if [[ "$candidate_count" -eq 0 ]]; then
 		echo "No systemic clusters met threshold (${systemic_threshold})."
 		rm -f "$candidate_file"
@@ -579,7 +580,7 @@ create_systemic_issues() {
 		local signal_tag="gh-failure-miner:${pattern_id}"
 
 		local existing_count
-		existing_count=$(gh issue list --repo "$repo_slug" --state open --search "\"${signal_tag}\" in:body" --json number --limit 1 2>/dev/null | jq 'length') || existing_count=0
+		existing_count=$(gh issue list --repo "$repo_slug" --state open --search "\"${signal_tag}\" in:body" --json number --limit 1 2>/dev/null | jq "$JQ_COUNT") || existing_count=0
 		if [[ "$existing_count" -gt 0 ]]; then
 			echo "Skipping cluster for ${check_name} - existing open issue with ${signal_tag}"
 			idx=$((idx + 1))
