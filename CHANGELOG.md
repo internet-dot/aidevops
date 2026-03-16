@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.10] - 2026-03-16
+
+### Added
+
+- add Google Workspace CLI (gws) to setup and auto-update (#5083)
+
+### Changed
+
+- Documentation: add task briefs for t1534, t1535 Linux scheduler bugs
+- Maintenance: add t1534, t1535 Linux scheduler bugs to TODO.md
+- Maintenance: claim t1535
+- Maintenance: claim t1534
+
 ## [3.0.9] - 2026-03-16
 
 ### Changed
