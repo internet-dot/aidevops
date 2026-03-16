@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.9] - 2026-03-16
+
+### Changed
+
+- Documentation: add WP Composer as preferred alternative to WPackagist in wp-dev.md (#5078)
+
+### Fixed
+
+- patch release preflight scans only changed files instead of entire repo (#5082)
+- ensure trailing newline in .gitignore before appending entries (#5080)
+
 ## [3.0.1] - 2026-03-15
 
 ### Changed
