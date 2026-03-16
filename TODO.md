@@ -106,6 +106,10 @@ Tasks with no open blockers - ready to work on. Use `/ready` to refresh this lis
 
 - [x] t1536 Add site: query optimization intelligence to GEO agents — update query-fanout-research.md, geo-strategy.md, sro-grounding.md, ai-search-readiness.md, and aeo-geo-patterns.md with GPT-5.4 site: operator retrieval patterns: 3-stage retrieval model (broad discovery -> site-specific deep-dive -> third-party validation), site-searchable content architecture, review platform citation strategy (G2/Capterra), UTM citation attribution tracking #feature #seo #geo ~4h model:sonnet ref:GH#5088 logged:2026-03-16 -> [todo/tasks/t1536-brief.md] pr:#5093 completed:2026-03-16
 
+### Product Agent Refactoring
+
+- [ ] t1537 Refactor shared product concerns from mobile-app-dev to product/ — extract universal product concerns (validation, onboarding, monetisation, UI design, analytics, growth) from mobile-app-dev/ into product/ directory. De-mobilify language, add growth.md acquisition playbook, update cross-references in mobile-app-dev.md and browser-extension-dev.md #refactor #product #auto-dispatch ~4h model:sonnet ref:GH#5092 logged:2026-03-16 started:2026-03-16
+
 ### Email System — Phase 1: Foundation (IMAP/SMTP + Composition)
 
 - [x] t1492 Email provider config templates and privacy ratings — configs/email-providers.json.txt with 15+ providers (Cloudron, Gmail, Google Workspace, Outlook, ProtonMail, Fastmail, mailbox.org, Tutanota, etc.), IMAP/SMTP/JMAP settings, privacy ratings, default folder name mappings, shared mailbox patterns, POP vs IMAP guidance #feature #email #auto-dispatch ~3h model:sonnet logged:2026-03-16 -> [todo/tasks/t1492-brief.md] pr:#5010 completed:2026-03-16
