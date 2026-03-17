@@ -963,3 +963,86 @@ migrate_pulse_repos_to_repos_json() {
 
 	return 0
 }
+
+# Migrate orphaned supervisor-helper.sh and supervisor/ modules (GH#5147)
+# After the supervisor-to-pulse-wrapper migration (PR #2291, PR #2475), the
+# upstream repo moved supervisor files to supervisor-archived/. But aidevops
+# update (rsync) only adds/overwrites — it doesn't delete files that no longer
+# exist in the source. Users who installed before the migration retain:
+#   - ~/.aidevops/agents/scripts/supervisor-helper.sh (old entry point)
+#   - ~/.aidevops/agents/scripts/supervisor/ (old module directory)
+#   - cron/launchd entries invoking supervisor-helper.sh pulse
+# These orphaned files shadow the new pulse-wrapper.sh architecture.
+# This migration removes the orphaned files and rewrites scheduler entries.
+migrate_orphaned_supervisor() {
+	local agents_dir="$HOME/.aidevops/agents"
+	local scripts_dir="$agents_dir/scripts"
+	local cleaned=0
+
+	# 1. Remove orphaned supervisor-helper.sh from deployed scripts
+	#    The canonical location is now supervisor-archived/supervisor-helper.sh
+	#    (shipped for reference/tests only, not as an active entry point)
+	if [[ -f "$scripts_dir/supervisor-helper.sh" ]]; then
+		rm -f "$scripts_dir/supervisor-helper.sh"
+		print_info "Removed orphaned supervisor-helper.sh from deployed scripts"
+		((++cleaned))
+	fi
+
+	# 2. Remove orphaned supervisor/ module directory
+	#    The canonical location is now supervisor-archived/ (shipped by rsync)
+	#    Only remove if it's the old modules dir (contains pulse.sh, dispatch.sh, etc.)
+	#    Do NOT remove supervisor-archived/ — that's the intentional archive
+	if [[ -d "$scripts_dir/supervisor" && ! -L "$scripts_dir/supervisor" ]]; then
+		# Verify it's the old module directory (not something user-created)
+		if [[ -f "$scripts_dir/supervisor/pulse.sh" ]] ||
+			[[ -f "$scripts_dir/supervisor/dispatch.sh" ]] ||
+			[[ -f "$scripts_dir/supervisor/_common.sh" ]]; then
+			rm -rf "$scripts_dir/supervisor"
+			print_info "Removed orphaned supervisor/ module directory from deployed scripts"
+			((++cleaned))
+		fi
+	fi
+
+	# 3. Migrate cron entries from supervisor-helper.sh to pulse-wrapper.sh
+	#    Old pattern: */2 * * * * ... supervisor-helper.sh pulse ...
+	#    New pattern: already installed by setup.sh's pulse section
+	#    Strategy: remove old entries; setup.sh will install the new one if pulse is enabled
+	local current_crontab
+	current_crontab=$(crontab -l 2>/dev/null) || current_crontab=""
+	if echo "$current_crontab" | grep -qF "supervisor-helper.sh"; then
+		# Remove all cron lines referencing supervisor-helper.sh
+		local new_crontab
+		new_crontab=$(echo "$current_crontab" | grep -v "supervisor-helper.sh")
+		if [[ -n "$new_crontab" ]]; then
+			printf '%s\n' "$new_crontab" | crontab - 2>/dev/null || true
+		else
+			# All entries were supervisor-helper.sh — clear crontab
+			echo "" | crontab - 2>/dev/null || true
+		fi
+		print_info "Removed orphaned supervisor-helper.sh cron entries"
+		print_info "  pulse-wrapper.sh will be installed by setup.sh if supervisor pulse is enabled"
+		((++cleaned))
+	fi
+
+	# 4. Migrate launchd entries from old supervisor label (macOS only)
+	#    Old label: com.aidevops.supervisor-pulse (from cron.sh/launchd.sh)
+	#    New label: com.aidevops.aidevops-supervisor-pulse (from setup.sh)
+	#    setup.sh already handles the new label cleanup at line ~1000, but
+	#    the old label from cron.sh may also be present
+	if [[ "$(uname -s)" == "Darwin" ]]; then
+		local old_label="com.aidevops.supervisor-pulse"
+		local old_plist="$HOME/Library/LaunchAgents/${old_label}.plist"
+		if [[ -f "$old_plist" ]] || _launchd_has_agent "$old_label" 2>/dev/null; then
+			launchctl unload "$old_plist" 2>/dev/null || true
+			rm -f "$old_plist"
+			print_info "Removed orphaned supervisor-pulse LaunchAgent ($old_label)"
+			((++cleaned))
+		fi
+	fi
+
+	if [[ $cleaned -gt 0 ]]; then
+		print_success "Cleaned up $cleaned orphaned supervisor artifact(s) — pulse-wrapper.sh is the active system"
+	fi
+
+	return 0
+}

@@ -716,6 +716,7 @@ main() {
 		migrate_mcp_env_to_credentials
 		migrate_pulse_repos_to_repos_json
 		cleanup_deprecated_paths
+		migrate_orphaned_supervisor
 		cleanup_deprecated_mcps
 		cleanup_stale_bun_opencode
 		validate_opencode_config
@@ -795,6 +796,7 @@ main() {
 		confirm_step "Migrate mcp-env.sh -> credentials.sh" && migrate_mcp_env_to_credentials
 		confirm_step "Migrate pulse-repos.json into repos.json" && migrate_pulse_repos_to_repos_json
 		confirm_step "Cleanup deprecated agent paths" && cleanup_deprecated_paths
+		confirm_step "Migrate orphaned supervisor to pulse-wrapper" && migrate_orphaned_supervisor
 		confirm_step "Cleanup deprecated MCP entries (hetzner, serper, etc.)" && cleanup_deprecated_mcps
 		confirm_step "Cleanup stale bun opencode install" && cleanup_stale_bun_opencode
 		confirm_step "Validate and repair OpenCode config schema" && validate_opencode_config
