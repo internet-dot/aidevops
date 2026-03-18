@@ -419,6 +419,25 @@ find_opencode_config() {
 	return 1
 }
 
+# Return latest Homebrew python@3.x formula (e.g. python@3.13).
+# Returns 0 and prints formula on success, 1 if unavailable.
+get_latest_homebrew_python_formula() {
+	if ! command -v brew >/dev/null 2>&1; then
+		return 1
+	fi
+
+	local latest_formula
+	latest_formula=$(brew search --formula '/^python@3\.[0-9]+$/' 2>/dev/null |
+		sort -t. -k2 -n -r | head -n 1)
+
+	if [[ -n "$latest_formula" ]]; then
+		echo "$latest_formula"
+		return 0
+	fi
+
+	return 1
+}
+
 # Find best python3 binary (prefer Homebrew/pyenv over system)
 find_python3() {
 	local candidates=(
@@ -426,18 +445,140 @@ find_python3() {
 		"/usr/local/bin/python3"
 		"$HOME/.pyenv/shims/python3"
 	)
+
+	# Add installed Homebrew versioned Python paths (including keg-only formulae)
+	if command -v brew >/dev/null 2>&1; then
+		local formula
+		while IFS= read -r formula; do
+			[[ -z "$formula" ]] && continue
+			local prefix
+			prefix=$(brew --prefix "$formula" 2>/dev/null || true)
+			[[ -z "$prefix" ]] && continue
+			local minor
+			minor="${formula#python@3.}"
+			candidates+=("$prefix/bin/python3")
+			candidates+=("$prefix/bin/python3.${minor}")
+		done < <(brew list --formula 2>/dev/null | awk '/^python@3\.[0-9]+$/ {print}')
+	fi
+
+	# Fallback to python3 on PATH
+	if command -v python3 >/dev/null 2>&1; then
+		candidates+=("$(command -v python3)")
+	fi
+
+	# Choose newest available Python by major.minor
+	local best_candidate=""
+	local best_major=-1
+	local best_minor=-1
+	local seen_candidates=" "
+	local candidate
 	for candidate in "${candidates[@]}"; do
-		if [[ -x "$candidate" ]]; then
-			echo "$candidate"
-			return 0
+		[[ -x "$candidate" ]] || continue
+		if [[ "$seen_candidates" == *" ${candidate} "* ]]; then
+			continue
+		fi
+		seen_candidates="${seen_candidates}${candidate} "
+
+		local version
+		version=$("$candidate" -c 'import sys; print("{}.{}".format(sys.version_info[0], sys.version_info[1]))' 2>/dev/null || true)
+		local major
+		major=$(echo "$version" | cut -d. -f1)
+		local minor
+		minor=$(echo "$version" | cut -d. -f2)
+		if [[ ! "$major" =~ ^[0-9]+$ ]] || [[ ! "$minor" =~ ^[0-9]+$ ]]; then
+			continue
+		fi
+
+		if ((major > best_major)) || { ((major == best_major)) && ((minor > best_minor)); }; then
+			best_major=$major
+			best_minor=$minor
+			best_candidate="$candidate"
 		fi
 	done
-	# Fallback to PATH
-	if command -v python3 &>/dev/null; then
-		command -v python3
+
+	if [[ -n "$best_candidate" ]]; then
+		echo "$best_candidate"
 		return 0
 	fi
+
 	return 1
+}
+
+# Return the recommended Homebrew Python formula name.
+# Uses get_latest_homebrew_python_formula if brew is available, otherwise
+# falls back to a sensible default. Reads PYTHON_REQUIRED_MAJOR/MINOR from
+# the environment (exported by setup.sh).
+# Usage: local formula; formula=$(get_recommended_python_formula)
+get_recommended_python_formula() {
+	local formula="python@3.13"
+	if command -v brew >/dev/null 2>&1; then
+		local detected
+		detected=$(get_latest_homebrew_python_formula 2>/dev/null || true)
+		if [[ -n "$detected" ]]; then
+			formula="$detected"
+		fi
+	fi
+	echo "$formula"
+	return 0
+}
+
+# Offer to install or upgrade Python via Homebrew (interactive prompt).
+# Handles both "Python too old" and "Python not found" cases.
+# Arguments:
+#   $1 - action: "upgrade" or "install"
+#   $2 - recommended formula (e.g. python@3.13)
+# Prints status messages. Returns 0 on success, 1 on skip/failure.
+offer_python_brew_install() {
+	local action="$1"
+	local recommended_formula="$2"
+	local python_required_major="${PYTHON_REQUIRED_MAJOR:-3}"
+	local python_required_minor="${PYTHON_REQUIRED_MINOR:-10}"
+
+	if ! command -v brew >/dev/null 2>&1; then
+		# No Homebrew — print manual instructions
+		if [[ "$action" == "upgrade" ]]; then
+			echo "  Upgrade recommendation (macOS): brew install $recommended_formula"
+		else
+			echo "  Install recommendation: Python $python_required_major.$python_required_minor+"
+			echo "    Ubuntu/Debian: sudo apt install python3"
+			echo "    Fedora:        sudo dnf install python3"
+			echo "    Arch:          sudo pacman -S python"
+		fi
+		return 1
+	fi
+
+	local prompt_verb="Install"
+	[[ "$action" == "upgrade" ]] && prompt_verb="Install/upgrade"
+	echo "  ${prompt_verb} recommendation: brew install $recommended_formula"
+
+	# Skip interactive prompt in CI or non-interactive runs
+	if [[ "${NON_INTERACTIVE:-false}" == "true" ]] || [[ ! -t 0 ]]; then
+		print_info "Skipped Python ${action} (non-interactive)"
+		return 1
+	fi
+
+	read -r -p "${prompt_verb} Python via Homebrew now? [Y/n]: " install_python
+	if [[ "$install_python" =~ ^[Yy]?$ ]]; then
+		if run_with_spinner "Installing $recommended_formula" brew install "$recommended_formula"; then
+			local python3_bin
+			if python3_bin=$(find_python3); then
+				local python_version
+				python_version=$("$python3_bin" -c 'import sys; print("{}.{}.{}".format(sys.version_info[0], sys.version_info[1], sys.version_info[2]))' 2>/dev/null || true)
+				print_success "Python ${action}d and available: $python_version"
+				return 0
+			else
+				print_warning "Python formula installed, but python3 is not on PATH yet"
+				print_info "Restart your shell or use Homebrew's shellenv instructions"
+				return 1
+			fi
+		else
+			print_warning "Python ${action} failed (non-critical)"
+			return 1
+		fi
+	else
+		print_info "Skipped Python ${action}"
+		return 1
+	fi
 }
 
 # Install a package globally via npm or bun, with sudo when needed on Linux.

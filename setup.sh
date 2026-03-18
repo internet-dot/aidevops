@@ -30,6 +30,11 @@ CLEAN_MODE=false
 INTERACTIVE_MODE=false
 NON_INTERACTIVE="${AIDEVOPS_NON_INTERACTIVE:-false}"
 UPDATE_TOOLS_MODE=false
+# Python compatibility floor used by setup checks and skill/tool gating.
+# Keep in sync with setup-modules/plugins.sh requirements.
+PYTHON_REQUIRED_MAJOR=3
+PYTHON_REQUIRED_MINOR=10
+export PYTHON_REQUIRED_MAJOR PYTHON_REQUIRED_MINOR
 # Platform constants — exported for sourced setup-modules (shell-env.sh,
 # tool-install.sh) that reference them at runtime.
 PLATFORM_MACOS=$([[ "$(uname -s)" == "Darwin" ]] && echo true || echo false)
@@ -363,26 +368,8 @@ find_opencode_config() {
 	return 1
 }
 
-# Find best python3 binary (prefer Homebrew/pyenv over system)
-find_python3() {
-	local candidates=(
-		"/opt/homebrew/bin/python3"
-		"/usr/local/bin/python3"
-		"$HOME/.pyenv/shims/python3"
-	)
-	for candidate in "${candidates[@]}"; do
-		if [[ -x "$candidate" ]]; then
-			echo "$candidate"
-			return 0
-		fi
-	done
-	# Fallback to PATH
-	if command -v python3 &>/dev/null; then
-		command -v python3
-		return 0
-	fi
-	return 1
-}
+# get_latest_homebrew_python_formula() and find_python3() are defined in
+# _common.sh (sourced above). Not duplicated here — see GH#5239 review.
 
 # Install a package globally via npm, with sudo when needed on Linux.
 # Usage: npm_global_install "package-name" OR npm_global_install "package@version"
