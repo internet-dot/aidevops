@@ -47,6 +47,16 @@ const REQUIRED_BETAS = [
   "interleaved-thinking-2025-05-14",
 ];
 
+const MODEL_CAPABILITY_OVERRIDES = {
+  "claude-3-7-sonnet-20250219": {
+    interleaved: true,
+  },
+  "claude-3-5-haiku-20241022": {
+    reasoning: true,
+    interleaved: true,
+  },
+};
+
 const TOOL_PREFIX = "mcp_";
 
 // ---------------------------------------------------------------------------
@@ -605,6 +615,13 @@ export function createPoolAuthHook(client) {
      */
     async loader(getAuth, provider) {
       const accounts = getAccounts("anthropic");
+
+      for (const [modelId, model] of Object.entries(provider.models || {})) {
+        const overrides = MODEL_CAPABILITY_OVERRIDES[modelId];
+        if (overrides) {
+          Object.assign(model, overrides);
+        }
+      }
 
       // Zero out costs for OAuth (Max plan pricing) regardless of mode
       const auth = await getAuth();
