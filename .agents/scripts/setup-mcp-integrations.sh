@@ -344,23 +344,23 @@ install_mcp() {
 	"context7")
 		print_info "Setting up Context7 MCP for real-time library documentation..."
 		print_info "Context7 provides up-to-date docs for libraries and frameworks."
-		print_info ""
+		echo ""
 		print_info "Two setup options:"
-		print_info ""
+		echo ""
 		print_info "  1. Remote MCP (recommended — zero install):"
 		print_info '     "context7": {'
 		print_info '       "type": "remote",'
 		print_info '       "url": "https://mcp.context7.com/mcp",'
 		print_info '       "enabled": true'
 		print_info '     }'
-		print_info ""
+		echo ""
 		print_info "  2. Local MCP (via npx):"
 		print_info '     "context7": {'
 		print_info '       "type": "local",'
-		print_info '       "command": ["npx", "@upstash/context7-mcp@latest"],'
+		print_info '       "command": ["npx", "-y", "@upstash/context7-mcp@latest"],'
 		print_info '       "enabled": true'
 		print_info '     }'
-		print_info ""
+		echo ""
 		print_info "Disable telemetry: export CTX7_TELEMETRY_DISABLED=1"
 		print_info "CLI alternative: npx ctx7 setup --opencode --cli"
 		print_info "Docs: ~/.aidevops/agents/tools/context/context7.md"
