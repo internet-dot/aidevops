@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.26] - 2026-03-20
+
+### Fixed
+
+- add role identity to Social-Media agent to prevent task declination (#5351)
+- deduplicate OpenCode plugin registration block in mcp-setup.sh (#5349)
+- address CodeRabbit and Gemini review findings in oauth-pool.mjs (#5341)
+- align opencode anthropic auth docs with versioned guidance (#5332) (#5343)
+- use jq for version parsing instead of grep (#5338)
+- harden oauth callback error handling (#5342)
+- mcp-setup.sh version parsing and comparison efficiency (#5339)
+
 ## [3.1.25] - 2026-03-20
 
 ### Fixed
