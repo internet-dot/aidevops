@@ -82,7 +82,9 @@ The aidevops plugin must be registered in OpenCode. This is done automatically b
 Verify with:
 
 ```bash
-if [[ -L ~/.config/opencode/plugins/opencode-aidevops ]] || grep -q "opencode-aidevops" ~/.config/opencode/opencode.json 2>/dev/null; then
+if [[ ( -L ~/.config/opencode/plugins/opencode-aidevops && -e ~/.config/opencode/plugins/opencode-aidevops ) \
+   || ( -d ~/.config/opencode/plugins/opencode-aidevops && -f ~/.config/opencode/plugins/opencode-aidevops/index.mjs ) \
+   || grep -q "opencode-aidevops" ~/.config/opencode/opencode.json 2>/dev/null ]]; then
   echo "Plugin registered"
 else
   echo "Run: aidevops setup"
