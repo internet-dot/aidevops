@@ -424,58 +424,6 @@ setup_browser_tools() {
 	return 0
 }
 
-add_opencode_plugin() {
-	local plugin_name plugin_spec opencode_config
-	plugin_name="$1"
-	plugin_spec="$2"
-	opencode_config="$3"
-
-	# Check if plugin array exists and if plugin is already configured
-	local has_plugin_array
-	if jq -e '.plugin' "$opencode_config" >/dev/null 2>&1; then
-		has_plugin_array="true"
-	else
-		has_plugin_array="false"
-	fi
-
-	if [[ "$has_plugin_array" == "true" ]]; then
-		# Check if plugin is already in the array
-		local plugin_exists
-		if jq -e --arg p "$plugin_name" '.plugin | map(select(startswith($p))) | length > 0' "$opencode_config" >/dev/null 2>&1; then
-			plugin_exists="true"
-		else
-			plugin_exists="false"
-		fi
-
-		if [[ "$plugin_exists" == "true" ]]; then
-			# Update existing plugin to latest version
-			local temp_file
-			temp_file=$(mktemp)
-			trap 'rm -f "${temp_file:-}"' RETURN
-			jq --arg old "$plugin_name" --arg new "$plugin_spec" \
-				'.plugin = [.plugin[] | if startswith($old) then $new else . end]' \
-				"$opencode_config" >"$temp_file" && mv "$temp_file" "$opencode_config"
-			print_success "Updated $plugin_name to latest version"
-		else
-			# Add plugin to existing array
-			local temp_file
-			temp_file=$(mktemp)
-			trap 'rm -f "${temp_file:-}"' RETURN
-			jq --arg p "$plugin_spec" '.plugin += [$p]' "$opencode_config" >"$temp_file" && mv "$temp_file" "$opencode_config"
-			print_success "Added $plugin_name plugin to OpenCode config"
-		fi
-	else
-		# Create plugin array with the plugin
-		local temp_file
-		temp_file=$(mktemp)
-		trap 'rm -f "${temp_file:-}"' RETURN
-		jq --arg p "$plugin_spec" '. + {plugin: [$p]}' "$opencode_config" >"$temp_file" && mv "$temp_file" "$opencode_config"
-		print_success "Created plugin array with $plugin_name"
-	fi
-
-	return 0
-}
-
 setup_opencode_plugins() {
 	# Check prerequisites before announcing setup (GH#5240)
 	if ! command -v opencode &>/dev/null; then
@@ -496,23 +444,34 @@ setup_opencode_plugins() {
 	local aidevops_plugin_src="$HOME/.aidevops/agents/plugins/opencode-aidevops"
 	local aidevops_plugin_dst="$plugins_dir/opencode-aidevops"
 	local pool_plugin_registered="false"
+	local aidevops_plugin_entrypoint="$aidevops_plugin_src/index.mjs"
 
-	if [[ ! -f "$aidevops_plugin_src/index.mjs" ]]; then
-		print_skip "OpenCode plugins" "aidevops plugin not found at $aidevops_plugin_src"
-		setup_track_deferred "OpenCode plugins" "Install/restore aidevops"
+	if [[ ! -f "$aidevops_plugin_entrypoint" ]]; then
+		print_skip "OpenCode plugins" "aidevops plugin entry point not found: $aidevops_plugin_entrypoint"
+		setup_track_deferred "OpenCode plugins" "Install/restore aidevops plugin at $aidevops_plugin_entrypoint"
 		return 0
 	fi
 
 	# Create plugins directory if needed
 	mkdir -p "$plugins_dir"
 
-	# Symlink if not already registered
-	if [[ -L "$aidevops_plugin_dst" || -d "$aidevops_plugin_dst" ]]; then
+	# Register plugin if needed; treat broken symlinks as unregistered.
+	if [[ -L "$aidevops_plugin_dst" && -e "$aidevops_plugin_dst" ]]; then
+		print_success "aidevops plugin already registered at ~/.config/opencode/plugins/"
+		setup_track_configured "OpenCode plugins"
+		pool_plugin_registered="true"
+	elif [[ -L "$aidevops_plugin_dst" ]]; then
+		print_warning "Broken aidevops plugin symlink detected; recreating ~/.config/opencode/plugins/opencode-aidevops"
+		ln -sfn "$aidevops_plugin_src" "$aidevops_plugin_dst"
+		print_success "aidevops plugin registered at ~/.config/opencode/plugins/"
+		setup_track_configured "OpenCode plugins"
+		pool_plugin_registered="true"
+	elif [[ -d "$aidevops_plugin_dst" && -f "$aidevops_plugin_dst/index.mjs" ]]; then
 		print_success "aidevops plugin already registered at ~/.config/opencode/plugins/"
 		setup_track_configured "OpenCode plugins"
 		pool_plugin_registered="true"
 	else
-		ln -sf "$aidevops_plugin_src" "$aidevops_plugin_dst"
+		ln -sfn "$aidevops_plugin_src" "$aidevops_plugin_dst"
 		print_success "aidevops plugin registered at ~/.config/opencode/plugins/"
 		setup_track_configured "OpenCode plugins"
 		pool_plugin_registered="true"
