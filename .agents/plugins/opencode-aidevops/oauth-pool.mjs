@@ -609,8 +609,8 @@ function startOAuthCallbackServer() {
     if (err.code === "EADDRINUSE") {
       console.error(
         `[aidevops] OAuth pool: port ${OAUTH_CALLBACK_PORT} in use — ` +
-        `OpenCode's built-in auth may be running. The user will need to ` +
-        `copy the code from the browser URL bar manually.`,
+          `OpenCode's built-in auth may be running. The user will need to ` +
+          `copy the code from the browser URL bar manually.`,
       );
       resolveReady(false);
       return;
@@ -719,9 +719,9 @@ function upsertAccount(provider, account) {
       const emails = namedAccounts.map((a) => a.email).join(", ");
       console.error(
         `[aidevops] OAuth pool: REFUSED to save account with unknown email. ` +
-        `${namedAccounts.length} named account(s) exist: ${emails}. ` +
-        `Re-auth via "Add Account to Pool" and enter the email when prompted, ` +
-        `or use /model-accounts-pool to manage accounts.`,
+          `${namedAccounts.length} named account(s) exist: ${emails}. ` +
+          `Re-auth via "Add Account to Pool" and enter the email when prompted, ` +
+          `or use /model-accounts-pool to manage accounts.`,
       );
       return false;
     }
@@ -2166,8 +2166,7 @@ export function createCursorPoolAuthHook(client) {
           if (!accessToken) {
             if (!isCursorAgentAvailable()) {
               console.error(
-                "[aidevops] OAuth pool: cursor-agent not found. " +
-                "Install it: curl -fsS https://cursor.com/install | bash",
+                `[aidevops] OAuth pool: cursor-agent not found. Install it: curl -fsS https://cursor.com/install | bash`,
               );
               return { type: "failed" };
             }
@@ -2361,18 +2360,19 @@ export function registerPoolProvider(config) {
  */
 export function createPoolTool(client) {
   return {
-    description:
-      "Manage OAuth account pool for provider credential rotation. " +
-      "Use 'list' to see all accounts and their status, " +
-      "'rotate' to switch to the next pool account, " +
-      "'remove <email>' to remove an account, " +
-      "'assign-pending <email>' to assign a pending unidentified token to an account, " +
-      "'check' to test token validity for all accounts, " +
-      "'status' for rotation statistics. " +
-      "Supports providers: anthropic (Claude Pro/Max), openai (ChatGPT Plus/Pro), " +
-      "and cursor (Cursor Pro). " +
-      "The agent should route natural language requests about managing " +
+    description: [
+      "Manage OAuth account pool for provider credential rotation.",
+      "Use 'list' to see all accounts and their status,",
+      "'rotate' to switch to the next pool account,",
+      "'remove <email>' to remove an account,",
+      "'assign-pending <email>' to assign a pending unidentified token to an account,",
+      "'check' to test token validity for all accounts,",
+      "'status' for rotation statistics.",
+      "Supports providers: anthropic (Claude Pro/Max), openai (ChatGPT Plus/Pro),",
+      "and cursor (Cursor Pro).",
+      "The agent should route natural language requests about managing",
       "provider accounts, OAuth pools, or credential rotation to this tool.",
+    ].join(" "),
     parameters: {
       type: "object",
       properties: {
