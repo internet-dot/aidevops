@@ -798,7 +798,7 @@ main() {
 		# cleanup internally when it runs, so running it again would be a double-run.
 		if [[ "$_agents_deployed" == "false" ]]; then
 			confirm_step "Archive completed plans from PLANS.md (deploy was skipped)" && {
-				local _plans_cleanup=".agents/scripts/plans-cleanup-helper.sh"
+				local _plans_cleanup="${INSTALL_DIR}/.agents/scripts/plans-cleanup-helper.sh"
 				if [[ -x "$_plans_cleanup" ]]; then
 					local _plans_exit=0
 					"$_plans_cleanup" archive || _plans_exit=$?

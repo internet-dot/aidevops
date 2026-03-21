@@ -20,17 +20,17 @@ get_plan_sections() {
 
 get_plan_status() {
 	local line="$1"
-	sed -n "$((line + 1)),$((line + 5))p" "$PLANS_FILE" | grep "Status:" | head -1 | sed 's/.*Status:\s*//'
+	sed -n "$((line + 1)),$((line + 5))p" "$PLANS_FILE" | grep "Status:" | head -1 | sed 's/.*Status:\s*//' || echo ''
 }
 
 get_plan_todos() {
 	local line="$1"
-	sed -n "$((line + 1)),$((line + 10))p" "$PLANS_FILE" | grep -oE "t[0-9]+" | sort -u
+	sed -n "$((line + 1)),$((line + 10))p" "$PLANS_FILE" | grep -oE "t[0-9]+(\.[0-9]+)*" | sort -u || true
 }
 
 check_todo_completed() {
 	local todo_id="$1"
-	grep -c "\[x\].*${todo_id}" "$TODO_FILE" 2>/dev/null
+	grep -c "\[x\].*${todo_id}" "$TODO_FILE" 2>/dev/null || echo '0'
 }
 
 check_plan_completed() {
@@ -187,7 +187,7 @@ cmd_archive() {
 	local idx
 	for idx in $(seq $((${#to_archive_starts[@]} - 1)) -1 0); do
 		local sed_exit=0
-		sed -i "${to_archive_starts[$idx]},${to_archive_ends[$idx]}d" "$temp_file" || sed_exit=$?
+		sed "${to_archive_starts[$idx]},${to_archive_ends[$idx]}d" "$temp_file" >"${temp_file}.tmp" && mv "${temp_file}.tmp" "$temp_file" || sed_exit=$?
 		if [ "$sed_exit" -eq 0 ]; then
 			archived=$((archived + 1))
 		else
@@ -261,7 +261,7 @@ cmd_remove() {
 	local idx
 	for idx in $(seq $((${#to_remove_starts[@]} - 1)) -1 0); do
 		local sed_exit=0
-		sed -i "${to_remove_starts[$idx]},${to_remove_ends[$idx]}d" "$temp_file" || sed_exit=$?
+		sed "${to_remove_starts[$idx]},${to_remove_ends[$idx]}d" "$temp_file" >"${temp_file}.tmp" && mv "${temp_file}.tmp" "$temp_file" || sed_exit=$?
 		if [ "$sed_exit" -eq 0 ]; then
 			removed=$((removed + 1))
 			echo "Removed: ${to_remove_titles[$idx]}"
