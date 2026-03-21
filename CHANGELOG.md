@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.38] - 2026-03-21
+
+### Added
+
+- add Cursor support to oauth-pool-helper.sh and /models-pool-check (#5384)
+
+### Changed
+
+- Documentation: add routing rules and provider-explicit examples to models-pool-check (#5379)
+
+### Fixed
+
+- address remaining CodeRabbit findings from PR #5375 (#5377)
+
 ## [3.1.37] - 2026-03-21
 
 ### Changed
