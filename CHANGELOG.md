@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.36] - 2026-03-21
+
+### Added
+
+- shell-based OAuth pool management and stale provider name fix (#5375)
+
 ## [3.1.35] - 2026-03-21
 
 ### Changed
