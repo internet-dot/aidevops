@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.42] - 2026-03-21
+
+### Added
+
+- add ClaudeBar to setup and upstream watch (#5420)
+
+### Changed
+
+- Maintenance: fix spelling optimisation→optimization in social-media.md (#5414)
+
+### Fixed
+
+- sync TOON plan status/phase with human-readable Completed headers (#5421)
+- use jq // empty and remove 2>/dev/null on repos.json reads (#5417)
+- harden unknown status sorting and remove dead constants in provider-auth (#5412)
+- robust Status-line lookup in sync_plans_status (GH#5392) (#5411)
+- use // empty in jq to eliminate null string check (GH#5385) (#5419)
+
 ## [3.1.41] - 2026-03-21
 
 ### Fixed
