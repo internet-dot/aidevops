@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.40] - 2026-03-21
+
+### Added
+
+- auto-configure opencode-cursor-oauth plugin in setup (#5408)
+
+### Fixed
+
+- use conventional FIXME tag for disabled auth hook workaround (#5400)
+
 ## [3.1.38] - 2026-03-21
 
 ### Added
