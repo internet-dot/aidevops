@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.32] - 2026-03-21
+
+### Changed
+
+- Maintenance: add #auto-dispatch to t1549 and t1550 for pulse pickup
+- Maintenance: add model tiers to t1549 (opus) and t1550 (sonnet)
+- Maintenance: add Cursor OAuth pool and model routing tasks (t1549, t1550)
+
+### Fixed
+
+- show clean placeholder when profile stats have no local data (#5360)
+
 ## [3.1.30] - 2026-03-21
 
 ### Changed
