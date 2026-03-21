@@ -8,7 +8,7 @@
 #   tool-version-check.sh --category npm  # Check only npm tools
 #   tool-version-check.sh --json       # Output as JSON
 #
-# Categories: npm, brew, pip, all (default)
+# Categories: npm, brew, pip, custom, all (default)
 
 # shellcheck disable=SC1091
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || exit
@@ -32,7 +32,7 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--category | -c)
 		if [[ -z "${2:-}" ]]; then
-			echo "Error: --category requires a value (npm, brew, pip, all)"
+			echo "Error: --category requires a value (npm, brew, pip, custom, all)"
 			exit 1
 		fi
 		CATEGORY="$2"
@@ -51,7 +51,7 @@ while [[ $# -gt 0 ]]; do
 		echo ""
 		echo "Options:"
 		echo "  --update, -u       Automatically update outdated tools"
-		echo "  --category, -c     Check only specific category (npm, brew, pip, all)"
+		echo "  --category, -c     Check only specific category (npm, brew, pip, custom, all)"
 		echo "  --json, -j         Output results as JSON"
 		echo "  --quiet, -q        Only show outdated tools"
 		echo "  --help, -h         Show this help"
@@ -98,6 +98,13 @@ PIP_TOOLS=(
 	"pip|Crawl4AI|crawl4ai|--version|crawl4ai|pip install --upgrade crawl4ai"
 	"pip|Analytics MCP|analytics-mcp|--version|analytics-mcp|pipx upgrade analytics-mcp"
 	"pip|Outscraper MCP|outscraper-mcp-server|--version|outscraper-mcp-server|uv tool upgrade outscraper-mcp-server"
+)
+
+# Tools installed via curl/custom installers (not in brew/npm/pip registries)
+# Latest version cannot be checked via registry — use "self" category
+# which skips latest-version lookup and just reports installed version
+CUSTOM_TOOLS=(
+	"self|Cursor CLI|agent|--version|cursor-agent|agent update"
 )
 
 # Counters
@@ -277,6 +284,7 @@ check_tool() {
 	npm) latest=$(get_npm_latest "$pkg") ;;
 	brew) latest=$(get_brew_latest "$pkg") ;;
 	pip) latest=$(get_pip_latest "$pkg") ;;
+	self) latest="$installed" ;; # Self-updating tools — no registry to check
 	*) latest="unknown" ;;
 	esac
 
@@ -386,6 +394,9 @@ main() {
 	pip)
 		check_category "Python/Pip" "${PIP_TOOLS[@]}"
 		;;
+	custom)
+		check_category "Custom/Self-Updating" "${CUSTOM_TOOLS[@]}"
+		;;
 	all | *)
 		if [[ ${#NPM_TOOLS[@]} -gt 0 ]]; then
 			check_category "NPM" "${NPM_TOOLS[@]}"
@@ -395,6 +406,9 @@ main() {
 		fi
 		if command -v pip &>/dev/null && [[ ${#PIP_TOOLS[@]} -gt 0 ]]; then
 			check_category "Python/Pip" "${PIP_TOOLS[@]}"
+		fi
+		if [[ ${#CUSTOM_TOOLS[@]} -gt 0 ]]; then
+			check_category "Custom/Self-Updating" "${CUSTOM_TOOLS[@]}"
 		fi
 		;;
 	esac
