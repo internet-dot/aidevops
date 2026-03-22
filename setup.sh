@@ -1607,18 +1607,12 @@ CW_PLIST
 		fi
 	fi
 
-	# Draft responses — private repo for reviewing AI-drafted replies to external
-	# contributions (t1555). Auto-creates the repo on first setup. Requires both
-	# contribution_watch and draft_responses to be enabled, plus gh CLI authenticated.
+	# Draft responses — local draft storage for reviewing AI-drafted replies to
+	# external contributions (t1555). Ensures workspace directory exists.
 	# Respects config: aidevops config set orchestration.draft_responses false
-	local dr_script="$HOME/.aidevops/agents/scripts/draft-response-helper.sh"
-	if [[ -x "$dr_script" ]] && is_feature_enabled draft_responses 2>/dev/null && is_feature_enabled contribution_watch 2>/dev/null && command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
-		# Init is idempotent — skips if repo already exists
-		if bash "$dr_script" init >/dev/null 2>&1; then
-			print_info "Draft responses repo ready (private, for contribution reply approval)"
-		else
-			print_warning "Draft responses repo setup failed (non-fatal)"
-		fi
+	if is_feature_enabled draft_responses 2>/dev/null && is_feature_enabled contribution_watch 2>/dev/null; then
+		mkdir -p "$HOME/.aidevops/.agent-workspace/draft-responses"
+		print_info "Draft responses enabled (use contribution-watch-helper.sh scan --auto-draft)"
 	fi
 
 	# Profile README — auto-create repo and seed README if not already set up.
