@@ -1522,7 +1522,7 @@ ST_PLIST
 	local cw_script="$HOME/.aidevops/agents/scripts/contribution-watch-helper.sh"
 	local cw_label="sh.aidevops.contribution-watch"
 	local cw_state="$HOME/.aidevops/cache/contribution-watch.json"
-	if [[ -x "$cw_script" ]] && is_feature_enabled contribution_watch 2>/dev/null && command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
+	if [[ -x "$cw_script" ]] && is_feature_enabled orchestration.contribution_watch 2>/dev/null && command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
 		mkdir -p "$HOME/.aidevops/cache" "$HOME/.aidevops/logs"
 
 		# Auto-seed on first run (populates state file with existing contributions)
@@ -1612,7 +1612,7 @@ CW_PLIST
 	# repo for GitHub notification-driven approval flow.
 	# Respects config: aidevops config set orchestration.draft_responses false
 	local dr_script="$HOME/.aidevops/agents/scripts/draft-response-helper.sh"
-	if [[ -x "$dr_script" ]] && is_feature_enabled draft_responses 2>/dev/null && is_feature_enabled contribution_watch 2>/dev/null && command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
+	if [[ -x "$dr_script" ]] && is_feature_enabled orchestration.draft_responses 2>/dev/null && is_feature_enabled orchestration.contribution_watch 2>/dev/null && command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
 		mkdir -p "$HOME/.aidevops/.agent-workspace/draft-responses"
 		if bash "$dr_script" init >/dev/null 2>&1; then
 			print_info "Draft responses ready (private repo + local drafts)"
