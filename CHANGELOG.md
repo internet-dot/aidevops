@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.56] - 2026-03-22
+
+### Changed
+
+- Documentation: update browser-use doc to v0.12.x API (Tools, CLI, Cloud, ChatBrowserUse) (#5463)
+
+### Fixed
+
+- skip launchd plist reload when content unchanged to preserve StartInterval timers (#5464)
+
 ## [3.1.55] - 2026-03-22
 
 ### Fixed
