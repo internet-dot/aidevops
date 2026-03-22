@@ -1523,7 +1523,22 @@ ST_PLIST
 	local cw_label="sh.aidevops.contribution-watch"
 	local cw_state="$HOME/.aidevops/cache/contribution-watch.json"
 	if [[ -x "$cw_script" ]] && is_feature_enabled contribution_watch 2>/dev/null && command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
-		mkdir -p "$HOME/.aidevops/cache" "$HOME/.aidevops/logs"
+		# Resolve log directory from config (paths.log_dir), expanding ~ to $HOME.
+		# Falls back to the default if config is unavailable or jq is missing.
+		# Validate before expansion to guard against shell metacharacter injection.
+		local _cw_log_dir
+		# shellcheck disable=SC2088  # Tilde is intentionally literal here; expanded below via ${/#\~/$HOME}
+		if type _jsonc_get &>/dev/null; then
+			_cw_log_dir=$(_jsonc_get "paths.log_dir" "~/.aidevops/logs")
+		else
+			_cw_log_dir="~/.aidevops/logs"
+		fi
+		if [[ "$_cw_log_dir" == *['`$']* ]]; then
+			print_error "Invalid characters in paths.log_dir: $_cw_log_dir"
+			return 1
+		fi
+		_cw_log_dir="${_cw_log_dir/#\~/$HOME}"
+		mkdir -p "$HOME/.aidevops/cache" "$_cw_log_dir"
 
 		# Auto-seed on first run (populates state file with existing contributions)
 		if [[ ! -f "$cw_state" ]]; then
@@ -1539,9 +1554,10 @@ ST_PLIST
 		if [[ "$(uname -s)" == "Darwin" ]]; then
 			local cw_plist="$HOME/Library/LaunchAgents/${cw_label}.plist"
 
-			local _xml_cw_script _xml_cw_home
+			local _xml_cw_script _xml_cw_home _xml_cw_log_dir
 			_xml_cw_script=$(_xml_escape "$cw_script")
 			_xml_cw_home=$(_xml_escape "$HOME")
+			_xml_cw_log_dir=$(_xml_escape "$_cw_log_dir")
 
 			local cw_plist_content
 			cw_plist_content=$(
@@ -1561,9 +1577,9 @@ ST_PLIST
 	<key>StartInterval</key>
 	<integer>3600</integer>
 	<key>StandardOutPath</key>
-	<string>${_xml_cw_home}/.aidevops/logs/contribution-watch.log</string>
+	<string>${_xml_cw_log_dir}/contribution-watch.log</string>
 	<key>StandardErrorPath</key>
-	<string>${_xml_cw_home}/.aidevops/logs/contribution-watch.log</string>
+	<string>${_xml_cw_log_dir}/contribution-watch.log</string>
 	<key>EnvironmentVariables</key>
 	<dict>
 		<key>PATH</key>
@@ -1597,7 +1613,7 @@ CW_PLIST
 			_cron_cw_script=$(_cron_escape "$cw_script")
 			(
 				crontab -l 2>/dev/null | grep -v 'aidevops: contribution-watch'
-				echo "0 * * * * /bin/bash ${_cron_cw_script} scan >> \"\$HOME/.aidevops/logs/contribution-watch.log\" 2>&1 # aidevops: contribution-watch"
+				echo "0 * * * * /bin/bash ${_cron_cw_script} scan >> \"${_cw_log_dir}/contribution-watch.log\" 2>&1 # aidevops: contribution-watch"
 			) | crontab - 2>/dev/null || true
 			if crontab -l 2>/dev/null | grep -qF "aidevops: contribution-watch" 2>/dev/null; then
 				print_info "Contribution watch enabled (cron, hourly scan)"
