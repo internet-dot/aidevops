@@ -742,6 +742,20 @@ cmd_scan() {
 		fi
 	fi
 
+	# Check-approvals: scan notification issues for user comments (t1556)
+	# Runs every scan cycle when draft_responses is enabled. Deterministic gate
+	# ensures no LLM cost for issues without new user comments.
+	if [[ "$_draft_enabled" == "true" && -x "$_draft_helper" ]]; then
+		_log_info "Running check-approvals scan"
+		local _approval_output=""
+		if ! _approval_output=$(bash "$_draft_helper" check-approvals 2>&1); then
+			_log_warn "Approval scan failed (exit $?): ${_approval_output}"
+			echo "Approval scan failed; see ${LOGFILE}."
+		else
+			echo "$_approval_output"
+		fi
+	fi
+
 	# Output results
 	if [[ "$needs_attention" -gt 0 ]]; then
 		echo -e "${YELLOW}${needs_attention} external contribution(s) need your reply:${NC}"
@@ -995,6 +1009,12 @@ cmd_help() {
 	echo "Draft responses (t1555):"
 	echo "  scan --auto-draft creates draft reply files for items needing attention."
 	echo "  Drafts are NEVER posted automatically — use draft-response-helper.sh approve <id>."
+	echo ""
+	echo "Approval scanning (t1556):"
+	echo "  Every scan cycle checks notification issues for user comments."
+	echo "  When found, an LLM interprets the user's intent (approve/decline/redraft/custom)."
+	echo "  Bot comments are filtered out. Role-based compose caps enforced."
+	echo "  Run manually: draft-response-helper.sh check-approvals"
 	return 0
 }
 
