@@ -430,8 +430,9 @@ merge_toon_contact() {
 		esac
 	done <<<"$existing"
 
-	# Update last_seen
-	existing=$(echo "$existing" | sed "s/^  last_seen: .*/  last_seen: ${now}/")
+	# Update last_seen (sed required: line-anchored replacement in multiline string)
+	# shellcheck disable=SC2001
+	existing=$(sed "s/^  last_seen: .*/  last_seen: ${now}/" <<<"$existing")
 
 	# Detect field changes and build history entries
 	local history_entries=""
@@ -454,11 +455,13 @@ merge_toon_contact() {
       new: ${new_val}
       source: ${source}
 "
-			# Update the field in the existing record
-			existing=$(echo "$existing" | sed "s|^  ${field_name}: .*|  ${field_name}: ${new_val}|")
+			# Update the field in the existing record (sed required: line-anchored multiline replacement)
+			# shellcheck disable=SC2001
+			existing=$(sed "s|^  ${field_name}: .*|  ${field_name}: ${new_val}|" <<<"$existing")
 		elif [[ -z "$old_val" ]]; then
-			# Fill empty field
-			existing=$(echo "$existing" | sed "s|^  ${field_name}: $|  ${field_name}: ${new_val}|")
+			# Fill empty field (sed required: line-anchored multiline replacement)
+			# shellcheck disable=SC2001
+			existing=$(sed "s|^  ${field_name}: $|  ${field_name}: ${new_val}|" <<<"$existing")
 		fi
 		return 0
 	}
@@ -491,7 +494,8 @@ ${history_entries}"
 	_field_line=$(echo "$existing" | grep -E "^  confidence: " || true)
 	existing_conf="${_field_line#  confidence: }"
 	if [[ "$confidence" == "high" && "$existing_conf" != "high" ]]; then
-		existing=$(echo "$existing" | sed "s/^  confidence: .*/  confidence: ${confidence}/")
+		# shellcheck disable=SC2001
+		existing=$(sed "s/^  confidence: .*/  confidence: ${confidence}/" <<<"$existing")
 	fi
 
 	echo "$existing" >"$toon_file"
