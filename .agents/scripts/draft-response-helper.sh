@@ -835,7 +835,7 @@ cmd_check_approvals() {
 		# Check for user comments on this notification issue
 		local sa_comments
 		sa_comments=$(gh api --paginate "repos/${slug}/issues/${sa_issue_number}/comments?per_page=100" \
-			--jq "[.[] | select(.user.login == \"${username}\") | select(.user.login | test(\"\\\\[bot\\\\]\$\"; \"i\") | not)]" \
+			--jq "[.[] | select(.user.login | test(\"\\\\[bot\\\\]\$\"; \"i\") | not)]" \
 			2>/dev/null) || sa_comments="[]"
 		local sa_user_comment_count
 		sa_user_comment_count=$(echo "$sa_comments" | jq 'length' 2>/dev/null) || sa_user_comment_count=0
