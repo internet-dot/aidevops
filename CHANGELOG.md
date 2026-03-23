@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.80] - 2026-03-23
+
+### Changed
+
+- Maintenance: add OpenCode to NPM_TOOLS with bun/npm auto-detection (#5570)
+
+### Fixed
+
+- add cooldown check to oauth-pool fallback account selection (#5552) (#5567)
+
 ## [3.1.79] - 2026-03-23
 
 ### Fixed
