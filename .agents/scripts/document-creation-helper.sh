@@ -417,6 +417,137 @@ cmd_status() {
 }
 
 # ============================================================================
+# Helper functions for cmd_install (extracted for complexity reduction)
+# ============================================================================
+
+_install_tier_minimal() {
+	log_info "Installing Tier 1: pandoc + poppler"
+	if [[ "$(uname)" == "Darwin" ]]; then
+		brew install pandoc poppler 2>&1 || true
+	elif has_cmd apt-get; then
+		sudo apt-get update && sudo apt-get install -y pandoc poppler-utils
+	else
+		die "Unsupported platform. Install pandoc and poppler manually."
+	fi
+	log_ok "Tier 1 installed"
+	return 0
+}
+
+_install_tier_standard() {
+	log_info "Installing Tier 2: Python libraries"
+	if ! has_cmd pandoc; then
+		log_info "Installing Tier 1 first..."
+		_install_tier_minimal
+	fi
+	if [[ ! -d "${VENV_DIR}" ]]; then
+		log_info "Creating Python venv at ${VENV_DIR}"
+		mkdir -p "$(dirname "${VENV_DIR}")"
+		python3 -m venv "${VENV_DIR}"
+	fi
+	activate_venv
+	pip install --quiet odfpy python-docx openpyxl
+	log_ok "Tier 2 installed (odfpy, python-docx, openpyxl)"
+	return 0
+}
+
+_install_tier_full() {
+	log_info "Installing Tier 3: LibreOffice headless"
+	if ! has_python_pkg odf 2>/dev/null; then
+		_install_tier_standard
+	fi
+	if [[ "$(uname)" == "Darwin" ]]; then
+		brew install --cask libreoffice 2>&1 || true
+	elif has_cmd apt-get; then
+		sudo apt-get update && sudo apt-get install -y libreoffice-core libreoffice-writer libreoffice-calc libreoffice-impress
+	else
+		die "Unsupported platform. Install LibreOffice manually."
+	fi
+	log_ok "Tier 3 installed"
+	return 0
+}
+
+_install_tier_ocr() {
+	log_info "Installing OCR tools"
+	if [[ "$(uname)" == "Darwin" ]]; then
+		brew install tesseract 2>&1 || true
+	elif has_cmd apt-get; then
+		sudo apt-get update && sudo apt-get install -y tesseract-ocr
+	fi
+	if [[ ! -d "${VENV_DIR}" ]]; then
+		mkdir -p "$(dirname "${VENV_DIR}")"
+		python3 -m venv "${VENV_DIR}"
+	fi
+	activate_venv
+	pip install --quiet easyocr
+	if has_cmd ollama; then
+		log_info "Pulling GLM-OCR model via Ollama..."
+		ollama pull glm-ocr 2>&1 || true
+	else
+		log_info "Ollama not installed -- skipping GLM-OCR (brew install ollama)"
+	fi
+	log_ok "OCR tools installed"
+	return 0
+}
+
+_install_specific_tool() {
+	local tool="$1"
+	case "${tool}" in
+	pandoc)
+		if [[ "$(uname)" == "Darwin" ]]; then brew install pandoc; else sudo apt-get install -y pandoc; fi
+		;;
+	poppler)
+		if [[ "$(uname)" == "Darwin" ]]; then brew install poppler; else sudo apt-get install -y poppler-utils; fi
+		;;
+	odfpy | python-docx | openpyxl)
+		if [[ ! -d "${VENV_DIR}" ]]; then
+			mkdir -p "$(dirname "${VENV_DIR}")"
+			python3 -m venv "${VENV_DIR}"
+		fi
+		activate_venv
+		pip install --quiet "${tool}"
+		;;
+	libreoffice)
+		if [[ "$(uname)" == "Darwin" ]]; then
+			brew install --cask libreoffice
+		else
+			sudo apt-get install -y libreoffice-core
+		fi
+		;;
+	mineru)
+		if [[ ! -d "${VENV_DIR}" ]]; then
+			mkdir -p "$(dirname "${VENV_DIR}")"
+			python3 -m venv "${VENV_DIR}"
+		fi
+		activate_venv
+		pip install "mineru[all]"
+		;;
+	tesseract)
+		if [[ "$(uname)" == "Darwin" ]]; then brew install tesseract; else sudo apt-get install -y tesseract-ocr; fi
+		;;
+	easyocr)
+		if [[ ! -d "${VENV_DIR}" ]]; then
+			mkdir -p "$(dirname "${VENV_DIR}")"
+			python3 -m venv "${VENV_DIR}"
+		fi
+		activate_venv
+		pip install --quiet easyocr
+		;;
+	glm-ocr)
+		if has_cmd ollama; then
+			ollama pull glm-ocr
+		else
+			die "Ollama required for GLM-OCR. Install: brew install ollama"
+		fi
+		;;
+	*)
+		die "Unknown tool: ${tool}"
+		;;
+	esac
+	log_ok "${tool} installed"
+	return 0
+}
+
+# ============================================================================
 # Install command
 # ============================================================================
 
@@ -426,126 +557,22 @@ cmd_install() {
 
 	case "${tier}" in
 	--minimal)
-		log_info "Installing Tier 1: pandoc + poppler"
-		if [[ "$(uname)" == "Darwin" ]]; then
-			brew install pandoc poppler 2>&1 || true
-		elif has_cmd apt-get; then
-			sudo apt-get update && sudo apt-get install -y pandoc poppler-utils
-		else
-			die "Unsupported platform. Install pandoc and poppler manually."
-		fi
-		log_ok "Tier 1 installed"
+		_install_tier_minimal
 		;;
 	--standard)
-		log_info "Installing Tier 2: Python libraries"
-		# Ensure Tier 1 first
-		if ! has_cmd pandoc; then
-			log_info "Installing Tier 1 first..."
-			cmd_install --minimal
-		fi
-		# Create venv
-		if [[ ! -d "${VENV_DIR}" ]]; then
-			log_info "Creating Python venv at ${VENV_DIR}"
-			mkdir -p "$(dirname "${VENV_DIR}")"
-			python3 -m venv "${VENV_DIR}"
-		fi
-		activate_venv
-		pip install --quiet odfpy python-docx openpyxl
-		log_ok "Tier 2 installed (odfpy, python-docx, openpyxl)"
+		_install_tier_standard
 		;;
 	--full)
-		log_info "Installing Tier 3: LibreOffice headless"
-		# Ensure Tier 1 + 2 first
-		if ! has_python_pkg odf 2>/dev/null; then
-			cmd_install --standard
-		fi
-		if [[ "$(uname)" == "Darwin" ]]; then
-			brew install --cask libreoffice 2>&1 || true
-		elif has_cmd apt-get; then
-			sudo apt-get update && sudo apt-get install -y libreoffice-core libreoffice-writer libreoffice-calc libreoffice-impress
-		else
-			die "Unsupported platform. Install LibreOffice manually."
-		fi
-		log_ok "Tier 3 installed"
+		_install_tier_full
 		;;
 	--ocr)
-		log_info "Installing OCR tools"
-		if [[ "$(uname)" == "Darwin" ]]; then
-			brew install tesseract 2>&1 || true
-		elif has_cmd apt-get; then
-			sudo apt-get update && sudo apt-get install -y tesseract-ocr
-		fi
-		if [[ ! -d "${VENV_DIR}" ]]; then
-			mkdir -p "$(dirname "${VENV_DIR}")"
-			python3 -m venv "${VENV_DIR}"
-		fi
-		activate_venv
-		pip install --quiet easyocr
-		if has_cmd ollama; then
-			log_info "Pulling GLM-OCR model via Ollama..."
-			ollama pull glm-ocr 2>&1 || true
-		else
-			log_info "Ollama not installed -- skipping GLM-OCR (brew install ollama)"
-		fi
-		log_ok "OCR tools installed"
+		_install_tier_ocr
 		;;
 	--tool)
 		if [[ -z "${tool}" ]]; then
 			die "Usage: install --tool <name> (pandoc|poppler|odfpy|python-docx|openpyxl|libreoffice|mineru|tesseract|easyocr|glm-ocr)"
 		fi
-		case "${tool}" in
-		pandoc)
-			if [[ "$(uname)" == "Darwin" ]]; then brew install pandoc; else sudo apt-get install -y pandoc; fi
-			;;
-		poppler)
-			if [[ "$(uname)" == "Darwin" ]]; then brew install poppler; else sudo apt-get install -y poppler-utils; fi
-			;;
-		odfpy | python-docx | openpyxl)
-			if [[ ! -d "${VENV_DIR}" ]]; then
-				mkdir -p "$(dirname "${VENV_DIR}")"
-				python3 -m venv "${VENV_DIR}"
-			fi
-			activate_venv
-			pip install --quiet "${tool}"
-			;;
-		libreoffice)
-			if [[ "$(uname)" == "Darwin" ]]; then
-				brew install --cask libreoffice
-			else
-				sudo apt-get install -y libreoffice-core
-			fi
-			;;
-		mineru)
-			if [[ ! -d "${VENV_DIR}" ]]; then
-				mkdir -p "$(dirname "${VENV_DIR}")"
-				python3 -m venv "${VENV_DIR}"
-			fi
-			activate_venv
-			pip install "mineru[all]"
-			;;
-		tesseract)
-			if [[ "$(uname)" == "Darwin" ]]; then brew install tesseract; else sudo apt-get install -y tesseract-ocr; fi
-			;;
-		easyocr)
-			if [[ ! -d "${VENV_DIR}" ]]; then
-				mkdir -p "$(dirname "${VENV_DIR}")"
-				python3 -m venv "${VENV_DIR}"
-			fi
-			activate_venv
-			pip install --quiet easyocr
-			;;
-		glm-ocr)
-			if has_cmd ollama; then
-				ollama pull glm-ocr
-			else
-				die "Ollama required for GLM-OCR. Install: brew install ollama"
-			fi
-			;;
-		*)
-			die "Unknown tool: ${tool}"
-			;;
-		esac
-		log_ok "${tool} installed"
+		_install_specific_tool "${tool}"
 		;;
 	*)
 		printf "Usage: %s install <tier>\n\n" "${SCRIPT_NAME}"
@@ -774,12 +801,113 @@ PYEOF
 # Convert command
 # ============================================================================
 
+
+# ============================================================================
+# Helper functions for select_tool (extracted for complexity reduction)
+# ============================================================================
+
+_select_tool_pdf() {
+	local to_ext="$1"
+	case "${to_ext}" in
+	md | markdown)
+		if has_rolm_ocr; then
+			printf 'rolm-ocr'
+		elif has_cmd mineru; then
+			printf 'mineru'
+		elif has_cmd pdftotext; then
+			printf 'pdftotext'
+		else
+			die "No tool available for pdf->md. Run: install --minimal (poppler) or install MinerU"
+		fi
+		;;
+	odt)
+		if has_python_pkg odf 2>/dev/null && has_cmd pdftotext; then
+			printf 'odfpy-pipeline'
+		else
+			die "No tool available for pdf->odt. Run: install --standard (odfpy + poppler)"
+		fi
+		;;
+	docx)
+		if has_cmd soffice || has_cmd libreoffice; then
+			printf 'libreoffice'
+		else
+			die "No tool available for pdf->docx. Run: install --full (LibreOffice)"
+		fi
+		;;
+	html)
+		if has_cmd pdftohtml; then
+			printf 'pdftohtml'
+		else
+			die "No tool available for pdf->html. Run: install --minimal (poppler)"
+		fi
+		;;
+	txt | text)
+		printf 'pdftotext'
+		;;
+	*)
+		die "Unsupported conversion: pdf -> ${to_ext}"
+		;;
+	esac
+	return 0
+}
+
+_select_tool_spreadsheet() {
+	local from_ext="$1"
+	local to_ext="$2"
+	if [[ "${to_ext}" == "csv" ]] || [[ "${from_ext}" == "csv" ]]; then
+		if has_python_pkg openpyxl 2>/dev/null; then
+			printf 'openpyxl'
+		elif has_cmd soffice || has_cmd libreoffice; then
+			printf 'libreoffice'
+		elif has_cmd pandoc; then
+			printf 'pandoc'
+		else
+			die "No tool available for spreadsheet conversion."
+		fi
+	elif has_cmd soffice || has_cmd libreoffice; then
+		printf 'libreoffice'
+	else
+		die "LibreOffice required for ${from_ext}->${to_ext}. Run: install --full"
+	fi
+	return 0
+}
+
+_select_tool_presentation() {
+	local from_ext="$1"
+	local to_ext="$2"
+	if [[ "${to_ext}" == "md" ]] || [[ "${to_ext}" == "markdown" ]]; then
+		if has_cmd pandoc; then
+			printf 'pandoc'
+		else
+			die "pandoc required for presentation->md."
+		fi
+	elif has_cmd soffice || has_cmd libreoffice; then
+		printf 'libreoffice'
+	elif has_cmd pandoc; then
+		printf 'pandoc'
+	else
+		die "No tool available for presentation conversion."
+	fi
+	return 0
+}
+
+_select_tool_html_to_md() {
+	if has_reader_lm; then
+		printf 'reader-lm'
+	elif has_cmd pandoc; then
+		printf 'pandoc'
+	else
+		die "No tool available for html->md. Run: install --minimal (pandoc) or ollama pull reader-lm"
+	fi
+	return 0
+}
+
+
 select_tool() {
 	local from_ext="$1"
 	local to_ext="$2"
 	local force_tool="${3:-}"
 
-	# If user forced a tool, use it
 	if [[ -n "${force_tool}" ]]; then
 		printf '%s' "${force_tool}"
 		return 0
@@ -793,47 +921,7 @@ select_tool() {
 
 	# PDF source requires special handling
 	if [[ "${from_ext}" == "pdf" ]]; then
-		case "${to_ext}" in
-		md | markdown)
-			# Prefer RolmOCR for GPU-accelerated PDF->md with table preservation
-			if has_rolm_ocr; then
-				printf 'rolm-ocr'
-			elif has_cmd mineru; then
-				printf 'mineru'
-			elif has_cmd pdftotext; then
-				printf 'pdftotext'
-			else
-				die "No tool available for pdf->md. Run: install --minimal (poppler) or install MinerU"
-			fi
-			;;
-		odt)
-			if has_python_pkg odf 2>/dev/null && has_cmd pdftotext; then
-				printf 'odfpy-pipeline'
-			else
-				die "No tool available for pdf->odt. Run: install --standard (odfpy + poppler)"
-			fi
-			;;
-		docx)
-			if has_cmd soffice || has_cmd libreoffice; then
-				printf 'libreoffice'
-			else
-				die "No tool available for pdf->docx. Run: install --full (LibreOffice)"
-			fi
-			;;
-		html)
-			if has_cmd pdftohtml; then
-				printf 'pdftohtml'
-			else
-				die "No tool available for pdf->html. Run: install --minimal (poppler)"
-			fi
-			;;
-		txt | text)
-			printf 'pdftotext'
-			;;
-		*)
-			die "Unsupported conversion: pdf -> ${to_ext}"
-			;;
-		esac
+		_select_tool_pdf "${to_ext}"
 		return 0
 	fi
 
@@ -864,51 +952,19 @@ select_tool() {
 
 	# Spreadsheet conversions: prefer LibreOffice
 	if [[ "${from_ext}" =~ ^(xlsx|ods|xls)$ ]] || [[ "${to_ext}" =~ ^(xlsx|ods|xls)$ ]]; then
-		if [[ "${to_ext}" == "csv" ]] || [[ "${from_ext}" == "csv" ]]; then
-			if has_python_pkg openpyxl 2>/dev/null; then
-				printf 'openpyxl'
-			elif has_cmd soffice || has_cmd libreoffice; then
-				printf 'libreoffice'
-			elif has_cmd pandoc; then
-				printf 'pandoc'
-			else
-				die "No tool available for spreadsheet conversion."
-			fi
-		elif has_cmd soffice || has_cmd libreoffice; then
-			printf 'libreoffice'
-		else
-			die "LibreOffice required for ${from_ext}->${to_ext}. Run: install --full"
-		fi
+		_select_tool_spreadsheet "${from_ext}" "${to_ext}"
 		return 0
 	fi
 
 	# Presentation conversions: prefer LibreOffice
 	if [[ "${from_ext}" =~ ^(pptx|odp|ppt)$ ]] || [[ "${to_ext}" =~ ^(pptx|odp|ppt)$ ]]; then
-		if [[ "${to_ext}" == "md" ]] || [[ "${to_ext}" == "markdown" ]]; then
-			if has_cmd pandoc; then
-				printf 'pandoc'
-			else
-				die "pandoc required for presentation->md."
-			fi
-		elif has_cmd soffice || has_cmd libreoffice; then
-			printf 'libreoffice'
-		elif has_cmd pandoc; then
-			printf 'pandoc'
-		else
-			die "No tool available for presentation conversion."
-		fi
+		_select_tool_presentation "${from_ext}" "${to_ext}"
 		return 0
 	fi
 
 	# HTML to markdown: prefer Reader-LM for table preservation
 	if [[ "${from_ext}" == "html" ]] && [[ "${to_ext}" =~ ^(md|markdown)$ ]]; then
-		if has_reader_lm; then
-			printf 'reader-lm'
-		elif has_cmd pandoc; then
-			printf 'pandoc'
-		else
-			die "No tool available for html->md. Run: install --minimal (pandoc) or ollama pull reader-lm"
-		fi
+		_select_tool_html_to_md
 		return 0
 	fi
 
@@ -921,6 +977,7 @@ select_tool() {
 
 	return 0
 }
+
 
 convert_with_pandoc() {
 	local input="$1"
@@ -1237,6 +1294,140 @@ convert_email() {
 
 	return 0
 }
+
+
+# ============================================================================
+# Extracted helpers for complexity reduction (t1044.12)
+# ============================================================================
+
+# Helpers for cmd_convert - extract argument parsing
+_convert_parse_args() {
+	local -n input_ref=$1 to_ext_ref=$2 output_ref=$3 force_tool_ref=$4
+	local -n template_ref=$5 extra_args_ref=$6 ocr_provider_ref=$7
+	local -n run_normalise_ref=$8 dedup_registry_ref=$9
+	shift 9
+	
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--to) to_ext_ref="$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')"; shift 2 ;;
+		--output | -o) output_ref="$2"; shift 2 ;;
+		--tool) force_tool_ref="$2"; shift 2 ;;
+		--template) template_ref="$2"; shift 2 ;;
+		--engine) extra_args_ref="--pdf-engine=$2"; shift 2 ;;
+		--dedup-registry) dedup_registry_ref="$2"; shift 2 ;;
+		--ocr) ocr_provider_ref="${2:-auto}"; shift; [[ $# -gt 0 && "$1" != --* ]] && { ocr_provider_ref="$1"; shift; } ;;
+		--no-normalise | --no-normalize) run_normalise_ref=false; shift ;;
+		--*) extra_args_ref="${extra_args_ref} $1"; shift ;;
+		*) [[ -z "${input_ref}" ]] && input_ref="$1"; shift ;;
+		esac
+	done
+	return 0
+}
+
+# Helpers for cmd_create - extract argument parsing
+_create_parse_args() {
+	local -n template_ref=$1 data_ref=$2 output_ref=$3 script_ref=$4
+	shift 4
+	
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--data) data_ref="$2"; shift 2 ;;
+		--output | -o) output_ref="$2"; shift 2 ;;
+		--script) script_ref="$2"; shift 2 ;;
+		--*) shift ;;
+		*) [[ -z "${template_ref}" ]] && template_ref="$1"; shift ;;
+		esac
+	done
+	return 0
+}
+
+# Helpers for cmd_import_emails - extract argument parsing
+_import_parse_args() {
+	local -n input_path_ref=$1 output_dir_ref=$2 skip_contacts_ref=$3
+	shift 3
+	
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--output | -o) output_dir_ref="$2"; shift 2 ;;
+		--skip-contacts) skip_contacts_ref=true; shift ;;
+		--*) log_warn "Unknown option: $1"; shift ;;
+		*) [[ -z "${input_path_ref}" ]] && input_path_ref="$1"; shift ;;
+		esac
+	done
+	return 0
+}
+
+# Helpers for cmd_template - extract argument parsing
+_template_parse_args() {
+	local -n doc_type_ref=$1 format_ref=$2 fields_ref=$3
+	local -n header_logo_ref=$4 footer_text_ref=$5 output_ref=$6
+	shift 6
+	
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--type) doc_type_ref="$2"; shift 2 ;;
+		--format) format_ref="$2"; shift 2 ;;
+		--fields) fields_ref="$2"; shift 2 ;;
+		--header-logo) header_logo_ref="$2"; shift 2 ;;
+		--footer-text) footer_text_ref="$2"; shift 2 ;;
+		--output) output_ref="$2"; shift 2 ;;
+		*) shift ;;
+		esac
+	done
+	return 0
+}
+
+# Helpers for cmd_normalise - extract argument parsing
+_normalise_parse_args() {
+	local -n input_ref=$1 output_ref=$2 inplace_ref=$3
+	local -n generate_pageindex_ref=$4 email_mode_ref=$5
+	shift 5
+	
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--output | -o) output_ref="$2"; shift 2 ;;
+		--inplace | -i) inplace_ref=true; shift ;;
+		--pageindex) generate_pageindex_ref=true; shift ;;
+		--email | -e) email_mode_ref=true; shift ;;
+		--*) shift ;;
+		*) [[ -z "${input_ref}" ]] && input_ref="$1"; shift ;;
+		esac
+	done
+	return 0
+}
+
+# Helpers for cmd_pageindex - extract argument parsing
+_pageindex_parse_args() {
+	local -n input_ref=$1 output_ref=$2 source_pdf_ref=$3 ollama_model_ref=$4
+	shift 4
+	
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--output | -o) output_ref="$2"; shift 2 ;;
+		--source-pdf) source_pdf_ref="$2"; shift 2 ;;
+		--ollama-model) ollama_model_ref="$2"; shift 2 ;;
+		--*) shift ;;
+		*) [[ -z "${input_ref}" ]] && input_ref="$1"; shift ;;
+		esac
+	done
+	return 0
+}
+
+# Helpers for cmd_generate_manifest - extract argument parsing
+_manifest_parse_args() {
+	local -n output_dir_ref=$1
+	shift
+	
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--*) log_warn "Unknown option: $1"; shift ;;
+		*) [[ -z "${output_dir_ref}" ]] && output_dir_ref="$1"; shift ;;
+		esac
+	done
+	return 0
+}
+
+
 
 cmd_convert() {
 	local input=""
@@ -1706,6 +1897,47 @@ PYEOF
 # ============================================================================
 # Create command (fill template with data)
 # ============================================================================
+
+
+# ============================================================================
+# Helper functions for cmd_create (extracted for complexity reduction)
+# ============================================================================
+
+_create_parse_args() {
+	local -n args_ref=$1
+	local -n template_ref=$2
+	local -n data_ref=$3
+	local -n output_ref=$4
+	local -n script_ref=$5
+	
+	while [[ $# -gt 1 ]]; do
+		case "$2" in
+		--data)
+			data_ref="$3"
+			shift 2
+			;;
+		--output | -o)
+			output_ref="$3"
+			shift 2
+			;;
+		--script)
+			script_ref="$3"
+			shift 2
+			;;
+		--*)
+			shift
+			;;
+		*)
+			if [[ -z "${template_ref}" ]]; then
+				template_ref="$2"
+			fi
+			shift
+			;;
+		esac
+	done
+	return 0
+}
+
 
 cmd_create() {
 	local template=""
