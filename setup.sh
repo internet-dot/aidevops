@@ -807,7 +807,6 @@ _setup_run_interactive() {
 	confirm_step "Setup file discovery tools (fd, ripgrep, ripgrep-all)" && setup_file_discovery_tools
 	confirm_step "Setup rtk (token-optimized CLI output, 60-90% savings)" && setup_rtk
 	confirm_step "Setup shell linting tools (shellcheck, shfmt)" && setup_shell_linting_tools
-	setup_shellcheck_wrapper
 	confirm_step "Setup Qlty CLI (multi-linter code quality)" && setup_qlty_cli
 	confirm_step "Rosetta audit (Apple Silicon x86 migration)" && setup_rosetta_audit
 	confirm_step "Setup Worktrunk (git worktree management)" && setup_worktrunk
