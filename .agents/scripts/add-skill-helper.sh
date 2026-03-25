@@ -1221,6 +1221,7 @@ cmd_add() {
 	# Clone and detect format (sets source_dir, skill_source_dir, format, skill_subdir)
 	local source_dir="" skill_source_dir="" format="" skill_subdir=""
 	if ! _clone_and_prepare_github "$owner" "$repo" "$subpath"; then
+		rm -rf "$TEMP_DIR"
 		return 1
 	fi
 
@@ -1231,7 +1232,7 @@ cmd_add() {
 	# Handle conflicts (may update skill_name/target_path in caller scope)
 	if ! _apply_conflict_resolution "$target_path" "$force" "$description" "$source_dir"; then
 		rm -rf "$TEMP_DIR"
-		return 0
+		return 1
 	fi
 
 	if [[ "$dry_run" == true ]]; then
@@ -1240,12 +1241,14 @@ cmd_add() {
 		if [[ -d "$skill_source_dir/scripts" || -d "$skill_source_dir/references" ]]; then
 			echo "  .agents/${target_path}/"
 		fi
+		rm -rf "$TEMP_DIR"
 		return 0
 	fi
 
 	# Convert and install files
 	local target_file=".agents/${target_path}.md"
 	if ! _convert_and_install_files "$format" "$source_dir" "$skill_source_dir" "$target_file" "$skill_name" "$target_path"; then
+		rm -rf "$TEMP_DIR"
 		return 1
 	fi
 
@@ -1422,7 +1425,7 @@ cmd_add_url() {
 	# Handle conflicts (may update skill_name/target_path in caller scope)
 	if ! _apply_conflict_resolution "$target_path" "$force" "$description" "$fetch_dir"; then
 		rm -rf "$fetch_dir"
-		return 0
+		return 1
 	fi
 
 	if [[ "$dry_run" == true ]]; then
@@ -1437,7 +1440,11 @@ cmd_add_url() {
 
 	# Convert URL content to aidevops format
 	local target_file=".agents/${target_path}.md"
-	_convert_url_to_skill "$fetch_file" "$target_file" "$skill_name" "$description" "$url"
+	if ! _convert_url_to_skill "$fetch_file" "$target_file" "$skill_name" "$description" "$url"; then
+		log_error "Failed to convert URL content to skill format"
+		rm -rf "$fetch_dir"
+		return 1
+	fi
 
 	# Finalize: security scan, register, cleanup
 	if ! _finalize_import "$fetch_dir" "$skill_name" "$skip_security" \
@@ -1469,6 +1476,18 @@ cmd_add_clawdhub() {
 
 	if [[ -z "$slug" ]]; then
 		log_error "ClawdHub slug required"
+		return 1
+	fi
+
+	# Sanitize slug to prevent path traversal (reject ../ and absolute paths)
+	if [[ "$slug" == *..* || "$slug" == /* ]]; then
+		log_error "Invalid slug (path traversal detected): $slug"
+		return 1
+	fi
+	# Strip any remaining path-unsafe characters (allow alphanumeric, hyphen, underscore)
+	slug=$(printf '%s' "$slug" | tr -cd 'a-zA-Z0-9_-')
+	if [[ -z "$slug" ]]; then
+		log_error "Slug is empty after sanitization"
 		return 1
 	fi
 
@@ -1510,7 +1529,7 @@ cmd_add_clawdhub() {
 
 	# Handle conflicts (may update skill_name/target_path in caller scope)
 	if ! _apply_conflict_resolution "$target_path" "$force" "$summary" "."; then
-		return 0
+		return 1
 	fi
 
 	if [[ "$dry_run" == true ]]; then
