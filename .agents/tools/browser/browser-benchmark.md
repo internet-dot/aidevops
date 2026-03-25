@@ -71,9 +71,9 @@ npx playwriter --version &>/dev/null 2>&1 && echo "[!!] Playwriter (needs extens
   echo "[--] Stagehand (run: mkdir -p ~/.aidevops/stagehand-bench && cd ~/.aidevops/stagehand-bench && npm init -y && npm i @browserbasehq/stagehand)"
 ```
 
-## Benchmark Scripts
+## Reference Benchmark: Playwright
 
-### Playwright
+All tools run the same 4 tests against the same URLs. Playwright is the reference implementation — other tools adapt the API calls shown in the tool-specific section below.
 
 ```javascript
 // ~/.aidevops/.agent-workspace/work/browser-bench/bench-playwright.mjs
@@ -125,6 +125,10 @@ async function run() {
 run();
 ```
 
+## Tool-Specific API Adaptations
+
+Each tool implements the same 4 tests. Below are the setup/teardown and API differences from the Playwright reference.
+
 ### dev-browser
 
 ```typescript
@@ -132,113 +136,44 @@ run();
 import { connect, waitForPageLoad } from "@/client.js";
 import type { Page } from "playwright";
 
-const TESTS = {
-  async navigate(page: Page) {
-    await page.goto('https://the-internet.herokuapp.com/');
-    await waitForPageLoad(page);
-    await page.screenshot({ path: '/tmp/bench-dev-nav.png' });
-  },
-  async formFill(page: Page) {
-    await page.goto('https://the-internet.herokuapp.com/login');
-    await waitForPageLoad(page);
-    await page.fill('#username', 'tomsmith');
-    await page.fill('#password', 'SuperSecretPassword!');
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/secure');
-  },
-  async extract(page: Page) {
-    await page.goto('https://the-internet.herokuapp.com/challenging_dom');
-    await waitForPageLoad(page);
-    const rows = await page.$$eval('table tbody tr', (trs: Element[]) =>
-      trs.slice(0, 5).map(tr => tr.textContent?.trim() ?? ''));
-    if (rows.length < 5) throw new Error('Expected 5+ rows');
-  },
-  async multiStep(page: Page) {
-    await page.goto('https://the-internet.herokuapp.com/');
-    await waitForPageLoad(page);
-    await page.click('a[href="/abtest"]');
-    await page.waitForURL('**/abtest');
-  }
-};
-
-async function run() {
-  const client = await connect("http://localhost:9222");
-  const results: Record<string, string[]> = {};
-  for (const [name, fn] of Object.entries(TESTS)) {
-    const times: string[] = [];
-    for (let i = 0; i < 3; i++) {
-      const page = await client.page("bench");
-      const start = performance.now();
-      try { await fn(page); times.push(((performance.now() - start) / 1000).toFixed(2)); }
-      catch (e: any) { times.push(`ERR: ${e.message}`); }
-    }
-    results[name] = times;
-  }
-  await client.disconnect();
-  console.log(JSON.stringify(results, null, 2));
-}
-run();
+// Setup: const client = await connect("http://localhost:9222");
+// Per-test: const page = await client.page("bench");
+// Teardown: await client.disconnect();
+// Key difference: add `await waitForPageLoad(page)` after every goto()
+// Extract types: (trs: Element[]) => trs.slice(0,5).map(tr => tr.textContent?.trim() ?? '')
 ```
 
 ### agent-browser
 
 ```bash
 #!/bin/bash
-# bench-agent-browser.sh
-set -euo pipefail
+# CLI-based — each operation is a separate command
+# Setup: (none — daemon auto-starts)
+# Teardown: agent-browser close
 
-bench_navigate() {
-  local start end
-  start=$(python3 -c 'import time; print(time.time())')
-  agent-browser open "https://the-internet.herokuapp.com/"
-  agent-browser screenshot /tmp/bench-ab-nav.png
-  end=$(python3 -c 'import time; print(time.time())')
-  python3 -c "print(f'{$end - $start:.2f}')"
-  agent-browser close
-}
+# navigate:
+agent-browser open "https://the-internet.herokuapp.com/"
+agent-browser screenshot /tmp/bench-ab-nav.png
 
-bench_formFill() {
-  local start end
-  start=$(python3 -c 'import time; print(time.time())')
-  agent-browser open "https://the-internet.herokuapp.com/login"
-  agent-browser snapshot -i
-  agent-browser fill '@username' 'tomsmith'
-  agent-browser fill '@password' 'SuperSecretPassword!'
-  agent-browser click '@submit'
-  agent-browser wait --url '**/secure'
-  end=$(python3 -c 'import time; print(time.time())')
-  python3 -c "print(f'{$end - $start:.2f}')"
-  agent-browser close
-}
+# formFill:
+agent-browser open "https://the-internet.herokuapp.com/login"
+agent-browser snapshot -i
+agent-browser fill '@username' 'tomsmith'
+agent-browser fill '@password' 'SuperSecretPassword!'
+agent-browser click '@submit'
+agent-browser wait --url '**/secure'
 
-bench_extract() {
-  local start end
-  start=$(python3 -c 'import time; print(time.time())')
-  agent-browser open "https://the-internet.herokuapp.com/challenging_dom"
-  agent-browser eval "JSON.stringify([...document.querySelectorAll('table tbody tr')].slice(0,5).map(r=>r.textContent.trim()))"
-  end=$(python3 -c 'import time; print(time.time())')
-  python3 -c "print(f'{$end - $start:.2f}')"
-  agent-browser close
-}
+# extract:
+agent-browser open "https://the-internet.herokuapp.com/challenging_dom"
+agent-browser eval "JSON.stringify([...document.querySelectorAll('table tbody tr')].slice(0,5).map(r=>r.textContent.trim()))"
 
-bench_multiStep() {
-  local start end
-  start=$(python3 -c 'import time; print(time.time())')
-  agent-browser open "https://the-internet.herokuapp.com/"
-  agent-browser click 'a[href="/abtest"]'
-  agent-browser wait --url '**/abtest'
-  agent-browser get url
-  end=$(python3 -c 'import time; print(time.time())')
-  python3 -c "print(f'{$end - $start:.2f}')"
-  agent-browser close
-}
+# multiStep:
+agent-browser open "https://the-internet.herokuapp.com/"
+agent-browser click 'a[href="/abtest"]'
+agent-browser wait --url '**/abtest'
+agent-browser get url
 
-echo "=== agent-browser Benchmark ==="
-for test in navigate formFill extract multiStep; do
-  echo -n "$test: "
-  for i in 1 2 3; do echo -n "$(bench_"$test")s "; done
-  echo ""
-done
+# Timing: use python3 -c 'import time; print(time.time())' for start/end
 ```
 
 ### Crawl4AI
@@ -246,94 +181,49 @@ done
 ```python
 # ~/.aidevops/.agent-workspace/work/browser-bench/bench-crawl4ai.py
 # Run: source ~/.aidevops/crawl4ai-venv/bin/activate && python bench-crawl4ai.py
-import asyncio, time, json
+# Limitation: navigate + extract only (no form fill or multi-step)
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 
-BROWSER_CONFIG = BrowserConfig(headless=True)
+# Setup: BROWSER_CONFIG = BrowserConfig(headless=True)
+# Context: async with AsyncWebCrawler(config=BROWSER_CONFIG) as crawler:
 
-async def bench_navigate():
-    async with AsyncWebCrawler(config=BROWSER_CONFIG) as crawler:
-        start = time.time()
-        result = await crawler.arun(url="https://the-internet.herokuapp.com/", config=CrawlerRunConfig(screenshot=True))
-        assert result.success, f"Failed: {result.error_message}"
-        return f"{time.time() - start:.2f}"
+# navigate:
+#   result = await crawler.arun(url=URL, config=CrawlerRunConfig(screenshot=True))
+#   assert result.success, f"Failed: {result.error_message}"
 
-async def bench_extract():
-    schema = {"name": "TableRows", "baseSelector": "table tbody tr",
-              "fields": [{"name": "text", "selector": "td:first-child", "type": "text"}]}
-    async with AsyncWebCrawler(config=BROWSER_CONFIG) as crawler:
-        start = time.time()
-        result = await crawler.arun(
-            url="https://the-internet.herokuapp.com/challenging_dom",
-            config=CrawlerRunConfig(extraction_strategy=JsonCssExtractionStrategy(schema)))
-        assert result.success
-        data = json.loads(result.extracted_content)
-        assert len(data) >= 5, f"Expected 5+ rows, got {len(data)}"
-        return f"{time.time() - start:.2f}"
-
-async def run():
-    results = {}
-    for name, fn in [("navigate", bench_navigate), ("extract", bench_extract)]:
-        times = [await fn() for _ in range(3)]
-        results[name] = times
-    print(json.dumps(results, indent=2))
-
-asyncio.run(run())
+# extract — CSS-based schema extraction:
+#   schema = {"name": "TableRows", "baseSelector": "table tbody tr",
+#             "fields": [{"name": "text", "selector": "td:first-child", "type": "text"}]}
+#   result = await crawler.arun(url=URL,
+#       config=CrawlerRunConfig(extraction_strategy=JsonCssExtractionStrategy(schema)))
+#   data = json.loads(result.extracted_content)
 ```
 
 ### Stagehand
 
 ```javascript
 // ~/.aidevops/.agent-workspace/work/browser-bench/bench-stagehand.mjs
+// Key difference: uses natural-language act() and structured extract()
 import { Stagehand } from "@browserbasehq/stagehand";
 import { z } from "zod";
 
-const TESTS = {
-  async navigate(sh) {
-    const page = sh.ctx.pages()[0];
-    await page.goto('https://the-internet.herokuapp.com/');
-    await page.screenshot({ path: '/tmp/bench-sh-nav.png' });
-  },
-  async formFill(sh) {
-    const page = sh.ctx.pages()[0];
-    await page.goto('https://the-internet.herokuapp.com/login');
-    await sh.act("fill the username field with tomsmith");
-    await sh.act("fill the password field with SuperSecretPassword!");
-    await sh.act("click the Login button");
-  },
-  async extract(sh) {
-    const page = sh.ctx.pages()[0];
-    await page.goto('https://the-internet.herokuapp.com/challenging_dom');
-    const data = await sh.extract("extract the first 5 rows from the table",
-      z.object({ rows: z.array(z.object({ text: z.string() })) }));
-    if (data.rows.length < 5) throw new Error('Expected 5+ rows');
-  },
-  async multiStep(sh) {
-    const page = sh.ctx.pages()[0];
-    await page.goto('https://the-internet.herokuapp.com/');
-    await sh.act("click the A/B Testing link");
-    await page.waitForURL('**/abtest');
-  }
-};
+// Setup per run: const sh = new Stagehand({ env: "LOCAL", headless: true, verbose: 0 }); await sh.init();
+// Page access: const page = sh.ctx.pages()[0];
+// Teardown: await sh.close();
 
-async function run() {
-  const results = {};
-  for (const [name, fn] of Object.entries(TESTS)) {
-    const times = [];
-    for (let i = 0; i < 3; i++) {
-      const sh = new Stagehand({ env: "LOCAL", headless: true, verbose: 0 });
-      await sh.init();
-      const start = performance.now();
-      try { await fn(sh); times.push(((performance.now() - start) / 1000).toFixed(2)); }
-      catch (e) { times.push(`ERR: ${e.message}`); }
-      await sh.close();
-    }
-    results[name] = times;
-  }
-  console.log(JSON.stringify(results, null, 2));
-}
-run();
+// formFill — natural language instead of selectors:
+//   await sh.act("fill the username field with tomsmith");
+//   await sh.act("fill the password field with SuperSecretPassword!");
+//   await sh.act("click the Login button");
+
+// extract — structured schema:
+//   const data = await sh.extract("extract the first 5 rows from the table",
+//     z.object({ rows: z.array(z.object({ text: z.string() })) }));
+
+// multiStep:
+//   await sh.act("click the A/B Testing link");
+//   await page.waitForURL('**/abtest');
 ```
 
 ## Running the Full Suite
@@ -354,36 +244,14 @@ OPENAI_API_KEY=... node bench-stagehand.mjs | tee results-stagehand.json
 echo "Done. Compare results and update browser-automation.md benchmarks table."
 ```
 
-## Updating Documentation
-
-After running benchmarks, update the Performance Benchmarks table in `browser-automation.md`:
-
-1. Take median of 3 runs per test
-2. Bold the fastest time per row
-3. Update the "Key insight" section if relative performance changed
-4. Note the date and environment
-
-```bash
-echo "Date: $(date +%Y-%m-%d)"
-echo "macOS: $(sw_vers -productVersion)"
-echo "Chip: $(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo 'Apple Silicon')"
-echo "Node: $(node --version)"
-echo "Bun: $(bun --version 2>/dev/null || echo 'N/A')"
-echo "Python: $(python3 --version)"
-```
-
-## Interpreting Results
-
-- **Cold start**: First agent-browser run is slower (daemon startup) — discard or note separately
-- **Network variance**: Times vary ~0.2-0.5s — use median of 3
-- **Stagehand API latency**: Depends on OpenAI/Anthropic response time — note model used
-- **Crawl4AI**: Cannot do form fill or multi-step (extraction only)
-- **Playwriter**: Requires manual extension activation — may skip in automated runs
-
 ## Parallel Instance Benchmarks
 
+Test concurrent page/session handling per tool.
+
+### Playwright (reference)
+
 ```javascript
-// bench-parallel.mjs
+// bench-parallel.mjs — tests 3 isolation levels
 import { chromium } from 'playwright';
 
 async function benchParallel() {
@@ -426,8 +294,10 @@ async function benchParallel() {
 benchParallel();
 ```
 
+### agent-browser
+
 ```bash
-# bench-parallel-ab.sh — agent-browser parallel sessions
+# bench-parallel-ab.sh — 3 parallel sessions
 set -euo pipefail
 start=$(python3 -c 'import time; print(time.time())')
 agent-browser --session s1 open "https://the-internet.herokuapp.com/login" &
@@ -442,79 +312,55 @@ echo "s3: $(agent-browser --session s3 get url)"
 agent-browser --session s1 close; agent-browser --session s2 close; agent-browser --session s3 close
 ```
 
+### Crawl4AI
+
 ```python
-# bench-parallel-crawl4ai.py
-import asyncio, time
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
-
-URLS = [
-    "https://the-internet.herokuapp.com/login",
-    "https://the-internet.herokuapp.com/checkboxes",
-    "https://the-internet.herokuapp.com/dropdown",
-    "https://the-internet.herokuapp.com/tables",
-    "https://the-internet.herokuapp.com/frames",
-]
-
-async def run():
-    browser_config = BrowserConfig(headless=True)
-    run_config = CrawlerRunConfig(screenshot=True)
-    start = time.time()
-    async with AsyncWebCrawler(config=browser_config) as crawler:
-        for url in URLS: await crawler.arun(url=url, config=run_config)
-    seq = time.time() - start
-    start = time.time()
-    async with AsyncWebCrawler(config=browser_config) as crawler:
-        await crawler.arun_many(urls=URLS, config=run_config)
-    par = time.time() - start
-    print(f"Sequential: {seq:.2f}s | Parallel: {par:.2f}s | Speedup: {seq/par:.1f}x")
-
-asyncio.run(run())
+# bench-parallel-crawl4ai.py — sequential vs arun_many()
+# Key API: crawler.arun_many(urls=URLS, config=run_config) for parallel crawling
+# Compare sequential (for loop with arun()) vs parallel (arun_many())
+# Test URLs: /login, /checkboxes, /dropdown, /tables, /frames
+# Output: "Sequential: Xs | Parallel: Ys | Speedup: Nx"
 ```
 
 ## Visual Verification Benchmark
 
+Tests the screenshot + AI analysis workflow: navigate -> viewport screenshot -> ARIA snapshot -> AI analyses both -> decide next action.
+
 ```javascript
-// bench-visual.mjs — Screenshot + AI analysis workflow timing
-import { chromium } from 'playwright';
-import fs from 'fs';
+// bench-visual.mjs — extends Playwright reference with ARIA + vision metrics
+// Test pages: /login (form), /tables (data table), /checkboxes (checkboxes)
+// Per page: goto() -> waitForLoadState('networkidle') -> screenshot + ARIA snapshot
+// WARNING: Do NOT use fullPage: true for AI vision — can exceed 8000px, crashing the session
 
-const PAGES = [
-  { url: 'https://the-internet.herokuapp.com/login', expect: 'login form' },
-  { url: 'https://the-internet.herokuapp.com/tables', expect: 'data table' },
-  { url: 'https://the-internet.herokuapp.com/checkboxes', expect: 'checkboxes' },
-];
+const page = await browser.newPage();
+await page.goto(url);
+await page.waitForLoadState('networkidle');
+await page.screenshot({ path: screenshotPath });           // viewport only
+const ariaSnapshot = await page.accessibility.snapshot();   // structured DOM
+const textContent = await page.evaluate(() => document.body.innerText.substring(0, 500));
 
-async function benchVisual() {
-  const browser = await chromium.launch({ headless: true });
-  const results = [];
-  for (const { url, expect: expected } of PAGES) {
-    const page = await browser.newPage();
-    const start = performance.now();
-    await page.goto(url);
-    await page.waitForLoadState('networkidle');
-    // WARNING: Do NOT use fullPage: true for AI vision — full-page captures can exceed 8000px, crashing the session
-    const screenshotPath = `/tmp/bench-visual-${Date.now()}.png`;
-    await page.screenshot({ path: screenshotPath });
-    const ariaSnapshot = await page.accessibility.snapshot();
-    const textContent = await page.evaluate(() => document.body.innerText.substring(0, 500));
-    const elapsed = ((performance.now() - start) / 1000).toFixed(2);
-    results.push({
-      url, expected, elapsed: `${elapsed}s`,
-      screenshotSize: `${(fs.statSync(screenshotPath).size / 1024).toFixed(0)}KB`,
-      ariaNodes: ariaSnapshot?.children?.length || 0,
-      textPreview: textContent.substring(0, 100),
-    });
-    await page.close();
-  }
-  await browser.close();
-  console.log(JSON.stringify(results, null, 2));
-}
-benchVisual();
+// Collected metrics per page:
+// { url, elapsed, screenshotSize (KB), ariaNodes, textPreview }
 ```
 
-**Visual verification workflow**: Navigate → viewport screenshot (no `fullPage: true`) → ARIA snapshot → AI analyses both → decide next action.
-
 **Key metrics**: screenshot file size (token cost), ARIA node count, time to screenshot-ready, whether ARIA alone suffices vs needing vision.
+
+## Results: Interpreting and Documenting
+
+After running benchmarks, update the Performance Benchmarks table in `browser-automation.md`: take median of 3 runs per test, bold the fastest time per row, update the "Key insight" section if relative performance changed, and note the date/environment.
+
+```bash
+echo "Date: $(date +%Y-%m-%d) | macOS: $(sw_vers -productVersion) | Node: $(node --version) | Bun: $(bun --version 2>/dev/null || echo N/A) | Python: $(python3 --version)"
+echo "Chip: $(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo 'Apple Silicon')"
+```
+
+**Interpretation notes:**
+
+- **Cold start**: First agent-browser run is slower (daemon startup) — discard or note separately
+- **Network variance**: Times vary ~0.2-0.5s — use median of 3
+- **Stagehand API latency**: Depends on OpenAI/Anthropic response time — note model used
+- **Crawl4AI**: Cannot do form fill or multi-step (extraction only)
+- **Playwriter**: Requires manual extension activation — may skip in automated runs
 
 ## Adding New Tools
 
