@@ -385,14 +385,8 @@ check_category() {
 	return 0
 }
 
-# Main
-main() {
-	if [[ "$JSON_OUTPUT" != "true" && "$QUIET" != "true" ]]; then
-		echo -e "${BOLD}${BLUE}Tool Version Check${NC}"
-		echo "=================="
-	fi
-
-	# Check requested categories
+# Run checks for the selected category (or all categories).
+_run_category_checks() {
 	case "$CATEGORY" in
 	npm)
 		check_category "NPM" "${NPM_TOOLS[@]}"
@@ -422,29 +416,108 @@ main() {
 		;;
 	esac
 
-	# Output results
-	if [[ "$JSON_OUTPUT" == "true" ]]; then
-		echo "{"
-		echo "  \"summary\": {"
-		echo "    \"installed\": $INSTALLED_COUNT,"
-		echo "    \"outdated\": $OUTDATED_COUNT,"
-		echo "    \"not_installed\": $NOT_INSTALLED_COUNT,"
-		echo "    \"timeout\": $TIMEOUT_COUNT,"
-		echo "    \"unknown\": $UNKNOWN_COUNT"
-		echo "  },"
-		echo "  \"tools\": ["
-		local first=true
-		for result in "${JSON_RESULTS[@]}"; do
-			if [[ "$first" == "true" ]]; then
-				first=false
-			else
-				echo ","
-			fi
-			echo -n "    $result"
-		done
+	return 0
+}
+
+# Emit JSON output for all results and return.
+_output_json_results() {
+	echo "{"
+	echo "  \"summary\": {"
+	echo "    \"installed\": $INSTALLED_COUNT,"
+	echo "    \"outdated\": $OUTDATED_COUNT,"
+	echo "    \"not_installed\": $NOT_INSTALLED_COUNT,"
+	echo "    \"timeout\": $TIMEOUT_COUNT,"
+	echo "    \"unknown\": $UNKNOWN_COUNT"
+	echo "  },"
+	echo "  \"tools\": ["
+	local first=true
+	for result in "${JSON_RESULTS[@]}"; do
+		if [[ "$first" == "true" ]]; then
+			first=false
+		else
+			echo ","
+		fi
+		echo -n "    $result"
+	done
+	echo ""
+	echo "  ]"
+	echo "}"
+
+	return 0
+}
+
+# Print human-readable summary counts.
+_output_summary() {
+	echo ""
+	echo -e "${BOLD}Summary${NC}"
+	echo "  Installed & up to date: $INSTALLED_COUNT"
+	echo "  Outdated: $OUTDATED_COUNT"
+	echo "  Not installed: $NOT_INSTALLED_COUNT"
+	if [[ $TIMEOUT_COUNT -gt 0 ]]; then
+		echo "  Timeout (version check hung): $TIMEOUT_COUNT"
+	fi
+	if [[ $UNKNOWN_COUNT -gt 0 ]]; then
+		echo "  Unknown (could not verify): $UNKNOWN_COUNT"
+	fi
+	echo ""
+
+	return 0
+}
+
+# Run updates for all outdated packages or print update instructions.
+_run_updates() {
+	if [[ "$AUTO_UPDATE" == "true" ]]; then
+		echo -e "${BLUE}Updating outdated tools...${NC}"
 		echo ""
-		echo "  ]"
-		echo "}"
+		for update_cmd in "${OUTDATED_PACKAGES[@]}"; do
+			echo "  Running: $update_cmd"
+			# Run update command directly (not via eval for security)
+			# Commands are hardcoded in tool definitions, not user input
+			# Timeout prevents hangs on slow registries/network issues
+			# Use timeout_sec for macOS compatibility (no native timeout)
+			# NOTE: Do NOT pipe timeout_sec output to tail/head — on macOS the
+			# perl alarm fallback doesn't close the pipe's write end on SIGALRM,
+			# causing tail to block forever. Use a temp file instead.
+			local _update_log
+			if ! _update_log=$(mktemp "${TMPDIR:-/tmp}/tool-update.XXXXXX"); then
+				echo -e "  ${RED}✗ Failed to create temp log${NC}"
+				continue
+			fi
+			if timeout_sec 120 bash -c "$update_cmd" >"$_update_log" 2>&1; then
+				tail -2 "$_update_log"
+				echo -e "  ${GREEN}✓ Updated${NC}"
+			else
+				tail -2 "$_update_log"
+				echo -e "  ${RED}✗ Failed${NC}"
+			fi
+			rm -f "$_update_log"
+			echo ""
+		done
+		echo -e "${GREEN}Updates complete. Re-run to verify.${NC}"
+	else
+		echo "To update all outdated tools, run:"
+		echo "  tool-version-check.sh --update"
+		echo ""
+		echo "Or update individually:"
+		for update_cmd in "${OUTDATED_PACKAGES[@]}"; do
+			echo "  $update_cmd"
+		done
+	fi
+
+	return 0
+}
+
+# Main
+main() {
+	if [[ "$JSON_OUTPUT" != "true" && "$QUIET" != "true" ]]; then
+		echo -e "${BOLD}${BLUE}Tool Version Check${NC}"
+		echo "=================="
+	fi
+
+	_run_category_checks
+
+	if [[ "$JSON_OUTPUT" == "true" ]]; then
+		_output_json_results
 		return 0
 	fi
 
@@ -454,62 +527,16 @@ main() {
 	fi
 
 	if [[ "$QUIET" != "true" ]]; then
-		echo ""
-		echo -e "${BOLD}Summary${NC}"
-		echo "  Installed & up to date: $INSTALLED_COUNT"
-		echo "  Outdated: $OUTDATED_COUNT"
-		echo "  Not installed: $NOT_INSTALLED_COUNT"
-		if [[ $TIMEOUT_COUNT -gt 0 ]]; then
-			echo "  Timeout (version check hung): $TIMEOUT_COUNT"
-		fi
-		if [[ $UNKNOWN_COUNT -gt 0 ]]; then
-			echo "  Unknown (could not verify): $UNKNOWN_COUNT"
-		fi
-		echo ""
+		_output_summary
 	fi
 
-	# Handle updates
 	if [[ $OUTDATED_COUNT -gt 0 ]]; then
-		if [[ "$AUTO_UPDATE" == "true" ]]; then
-			echo -e "${BLUE}Updating outdated tools...${NC}"
-			echo ""
-			for update_cmd in "${OUTDATED_PACKAGES[@]}"; do
-				echo "  Running: $update_cmd"
-				# Run update command directly (not via eval for security)
-				# Commands are hardcoded in tool definitions, not user input
-				# Timeout prevents hangs on slow registries/network issues
-				# Use timeout_sec for macOS compatibility (no native timeout)
-				# NOTE: Do NOT pipe timeout_sec output to tail/head — on macOS the
-				# perl alarm fallback doesn't close the pipe's write end on SIGALRM,
-				# causing tail to block forever. Use a temp file instead.
-				local _update_log
-				if ! _update_log=$(mktemp "${TMPDIR:-/tmp}/tool-update.XXXXXX"); then
-					echo -e "  ${RED}✗ Failed to create temp log${NC}"
-					continue
-				fi
-				if timeout_sec 120 bash -c "$update_cmd" >"$_update_log" 2>&1; then
-					tail -2 "$_update_log"
-					echo -e "  ${GREEN}✓ Updated${NC}"
-				else
-					tail -2 "$_update_log"
-					echo -e "  ${RED}✗ Failed${NC}"
-				fi
-				rm -f "$_update_log"
-				echo ""
-			done
-			echo -e "${GREEN}Updates complete. Re-run to verify.${NC}"
-		else
-			echo "To update all outdated tools, run:"
-			echo "  tool-version-check.sh --update"
-			echo ""
-			echo "Or update individually:"
-			for update_cmd in "${OUTDATED_PACKAGES[@]}"; do
-				echo "  $update_cmd"
-			done
-		fi
+		_run_updates
 	else
 		echo -e "${GREEN}All installed tools are up to date!${NC}"
 	fi
+
+	return 0
 }
 
 main

@@ -703,28 +703,12 @@ EOF
 	return 0
 }
 
-# --- Test 2.4: SOPS encrypt/decrypt git round-trip (if tools available) ---
-test_sops_git_roundtrip() {
-	echo ""
-	echo "=== Test 2.4: SOPS encrypt/decrypt git round-trip ==="
+# Generate a temporary age key pair for SOPS testing.
+# Arguments: $1 - key directory path
+# Outputs: public key to stdout; returns 1 on failure.
+_sops_setup_age_key() {
+	local age_key_dir="$1"
 
-	if [[ "$HAS_SOPS" != "true" ]]; then
-		skip "sops not installed -- skipping SOPS git round-trip test"
-		return 0
-	fi
-
-	if [[ "$HAS_AGE" != "true" ]]; then
-		skip "age not installed -- skipping SOPS git round-trip test"
-		return 0
-	fi
-
-	info "Testing full SOPS encrypt -> git commit -> decrypt round-trip"
-
-	local test_repo="$TEST_DIR/sops-git-repo"
-	mkdir -p "$test_repo"
-
-	# Generate a temporary age key for testing
-	local age_key_dir="$TEST_DIR/sops-age-keys"
 	mkdir -p "$age_key_dir"
 	chmod 700 "$age_key_dir"
 	age-keygen -o "$age_key_dir/keys.txt"
@@ -734,12 +718,22 @@ test_sops_git_roundtrip() {
 
 	if [[ -z "$pub_key" ]]; then
 		fail "Failed to generate age key pair"
-		return 0
+		return 1
 	fi
 
 	pass "Generated temporary age key for testing"
+	printf '%s' "$pub_key"
 
-	# Initialize git repo with .sops.yaml
+	return 0
+}
+
+# Initialise a git repo with .sops.yaml and a plaintext config file.
+# Arguments: $1 - repo path, $2 - age public key
+_sops_setup_git_repo() {
+	local test_repo="$1"
+	local pub_key="$2"
+
+	mkdir -p "$test_repo"
 	(
 		cd "$test_repo"
 		git init -q
@@ -753,7 +747,6 @@ creation_rules:
       ${pub_key}
 EOF
 
-		# Create a config file with test data
 		cat >config.enc.yaml <<'EOF'
 database:
     host: db.example.com
@@ -770,27 +763,28 @@ EOF
 		git commit -q -m "init: add sops config"
 	)
 
-	# Encrypt the config file
-	local original_content
-	original_content=$(cat "$test_repo/config.enc.yaml")
+	return 0
+}
 
-	export SOPS_AGE_KEY_FILE="$age_key_dir/keys.txt"
+# Encrypt the config file and verify ciphertext properties.
+# Arguments: $1 - repo path
+# Returns: 1 if encryption failed (caller should abort).
+_sops_verify_encryption() {
+	local test_repo="$1"
 
 	if sops encrypt -i "$test_repo/config.enc.yaml"; then
 		pass "SOPS encryption succeeded"
 	else
 		fail "SOPS encryption failed"
-		return 0
+		return 1
 	fi
 
-	# Verify the file is now encrypted (contains sops metadata)
 	if grep -q "sops:" "$test_repo/config.enc.yaml"; then
 		pass "Encrypted file contains sops metadata"
 	else
 		fail "Encrypted file missing sops metadata"
 	fi
 
-	# Verify plaintext values are NOT in the encrypted file
 	if ! grep -q "super-secret-password-12345" "$test_repo/config.enc.yaml"; then
 		pass "Plaintext password not visible in encrypted file"
 	else
@@ -803,16 +797,21 @@ EOF
 		fail "Plaintext API key visible in encrypted file"
 	fi
 
-	# Commit encrypted file to git
 	(
 		cd "$test_repo"
 		git add config.enc.yaml
 		git commit -q -m "feat: add encrypted config"
 	)
-
 	pass "Committed encrypted config to git"
 
-	# Decrypt and verify round-trip integrity
+	return 0
+}
+
+# Decrypt the config file and verify round-trip integrity.
+# Arguments: $1 - repo path
+_sops_verify_roundtrip() {
+	local test_repo="$1"
+
 	local decrypted
 	decrypted=$(sops decrypt "$test_repo/config.enc.yaml") || true
 
@@ -834,7 +833,6 @@ EOF
 		fail "Decrypted content missing original host"
 	fi
 
-	# Verify git log shows the encrypted commit
 	local commit_count
 	commit_count=$(cd "$test_repo" && git log --oneline | wc -l | tr -d ' ')
 	if [[ "$commit_count" -eq 2 ]]; then
@@ -842,6 +840,42 @@ EOF
 	else
 		fail "Expected 2 commits, got $commit_count"
 	fi
+
+	return 0
+}
+
+# --- Test 2.4: SOPS encrypt/decrypt git round-trip (if tools available) ---
+test_sops_git_roundtrip() {
+	echo ""
+	echo "=== Test 2.4: SOPS encrypt/decrypt git round-trip ==="
+
+	if [[ "$HAS_SOPS" != "true" ]]; then
+		skip "sops not installed -- skipping SOPS git round-trip test"
+		return 0
+	fi
+
+	if [[ "$HAS_AGE" != "true" ]]; then
+		skip "age not installed -- skipping SOPS git round-trip test"
+		return 0
+	fi
+
+	info "Testing full SOPS encrypt -> git commit -> decrypt round-trip"
+
+	local test_repo="$TEST_DIR/sops-git-repo"
+	local age_key_dir="$TEST_DIR/sops-age-keys"
+
+	local pub_key
+	pub_key=$(_sops_setup_age_key "$age_key_dir") || return 0
+
+	_sops_setup_git_repo "$test_repo" "$pub_key"
+
+	export SOPS_AGE_KEY_FILE="$age_key_dir/keys.txt"
+
+	_sops_verify_encryption "$test_repo" || {
+		unset SOPS_AGE_KEY_FILE
+		return 0
+	}
+	_sops_verify_roundtrip "$test_repo"
 
 	unset SOPS_AGE_KEY_FILE
 

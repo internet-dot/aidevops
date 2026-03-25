@@ -58,144 +58,169 @@ cat >"$TEST_DIR/staleness-check.sh" <<'FUNC_EOF'
 #      mentioning the same terms
 #   4. Score staleness signals — strong = STALE, weak = UNCERTAIN
 #######################################
-check_task_staleness() {
-    local task_id="${1:-}"
-    local task_description="${2:-}"
-    local project_root="${3:-.}"
+#######################################
+# _staleness_check_removal_signals — Signal 1
+# Check feature/tool names for removal commits.
+# Arguments:
+#   $1 - task_description
+#   $2 - project_root
+#   $3 - name of integer variable to accumulate signals into (passed by name)
+#   $4 - name of string variable to accumulate reasons into (passed by name)
+# Returns: 0 always
+#######################################
+_staleness_check_removal_signals() {
+    local task_description="$1"
+    local project_root="$2"
+    local _signals_var="$3"
+    local _reasons_var="$4"
 
-    if [[ -z "$task_id" || -z "$task_description" ]]; then
-        return 1  # Can't check without description — assume current
-    fi
-
-    local staleness_signals=0
-    local staleness_reasons=""
-
-    # --- Signal 1: Extract feature/tool names and check for removal commits ---
-    # Pattern: hyphenated names with 2+ segments (widget-helper, oh-my-opencode, etc.)
     local feature_names=""
     feature_names=$(printf '%s' "$task_description" \
         | grep -oE '[a-zA-Z][a-zA-Z0-9]*-[a-zA-Z][a-zA-Z0-9]+(-[a-zA-Z][a-zA-Z0-9]+)*' \
         | sort -u) || true
 
-    # Also extract quoted terms
     local quoted_terms=""
     quoted_terms=$(printf '%s' "$task_description" \
         | grep -oE '"[^"]{3,}"' | tr -d '"' | sort -u) || true
 
-    # Combine feature names for checking
     local all_terms=""
     all_terms=$(printf '%s\n%s' "$feature_names" "$quoted_terms" \
         | grep -v '^$' | sort -u) || true
 
-    if [[ -n "$all_terms" ]]; then
-        while IFS= read -r term; do
-            [[ -z "$term" ]] && continue
+    [[ -z "$all_terms" ]] && return 0
 
-            # Check git log for removal/deletion commits mentioning this term
-            local removal_commits=""
-            removal_commits=$(git -C "$project_root" log --oneline -200 \
-                --grep="$term" 2>/dev/null \
-                | grep -iE "remov|delet|drop|deprecat|clean.?up|refactor.*remov" \
-                | head -3) || true
+    while IFS= read -r term; do
+        [[ -z "$term" ]] && continue
 
-            if [[ -n "$removal_commits" ]]; then
-                # Found removal commits — check if term still has ACTIVE usage
-                # Exclude planning/historical files
-                local codebase_refs=0
-                codebase_refs=$(git -C "$project_root" grep -rl "$term" \
-                    -- '*.sh' '*.md' '*.mjs' '*.ts' '*.json' 2>/dev/null \
-                    | grep -cv 'TODO.md\|CHANGELOG.md\|VERIFY.md\|PLANS.md\|verification\|todo/' \
-                    2>/dev/null) || true
+        local removal_commits=""
+        removal_commits=$(git -C "$project_root" log --oneline -200 \
+            --grep="$term" 2>/dev/null \
+            | grep -iE "remov|delet|drop|deprecat|clean.?up|refactor.*remov" \
+            | head -3) || true
 
-                # Check if the most recent commit mentioning this term is a removal
-                local newest_commit_is_removal=false
-                local newest_commit=""
-                newest_commit=$(git -C "$project_root" log --oneline -1 \
-                    --grep="$term" 2>/dev/null) || true
+        [[ -z "$removal_commits" ]] && continue
 
-                if [[ -n "$newest_commit" ]]; then
-                    if printf '%s' "$newest_commit" \
-                        | grep -qiE "remov|delet|drop|deprecat|clean.?up"; then
-                        newest_commit_is_removal=true
-                    fi
-                fi
+        local codebase_refs=0
+        codebase_refs=$(git -C "$project_root" grep -rl "$term" \
+            -- '*.sh' '*.md' '*.mjs' '*.ts' '*.json' 2>/dev/null \
+            | grep -cv 'TODO.md\|CHANGELOG.md\|VERIFY.md\|PLANS.md\|verification\|todo/' \
+            2>/dev/null) || true
 
-                # Filter out references that are about the removal itself
-                local active_refs=0
-                if [[ "$codebase_refs" -gt 0 ]]; then
-                    active_refs=$(git -C "$project_root" grep -rn "$term" \
-                        -- '*.sh' '*.md' '*.mjs' '*.ts' '*.json' 2>/dev/null \
-                        | grep -v 'TODO.md\|CHANGELOG.md\|VERIFY.md\|PLANS.md\|verification\|todo/' \
-                        | grep -icv 'remov\|delet\|deprecat\|clean.up\|no longer\|was removed\|dropped\|legacy\|historical\|formerly\|previously\|used to\|compat\|detect\|OMOC\|Phase 0' \
-                        2>/dev/null) || true
-                fi
+        local newest_commit_is_removal=false
+        local newest_commit=""
+        newest_commit=$(git -C "$project_root" log --oneline -1 \
+            --grep="$term" 2>/dev/null) || true
 
-                local first_removal=""
-                first_removal=$(printf '%s' "$removal_commits" | head -1)
-
-                if [[ "$newest_commit_is_removal" == "true" && "$active_refs" -eq 0 ]]; then
-                    # Strongest signal: most recent commit is removal AND no active refs
-                    staleness_signals=$((staleness_signals + 3))
-                    staleness_reasons="${staleness_reasons}REMOVED: '$term' — most recent commit is a removal (${first_removal}), 0 active refs. "
-                elif [[ "$active_refs" -eq 0 ]]; then
-                    # Removal commits exist, no active refs (but newer non-removal commits exist)
-                    staleness_signals=$((staleness_signals + 3))
-                    staleness_reasons="${staleness_reasons}REMOVED: '$term' was removed (${first_removal}) with 0 active codebase references. "
-                elif [[ "$newest_commit_is_removal" == "true" ]]; then
-                    # Most recent commit is removal but some active refs remain
-                    staleness_signals=$((staleness_signals + 2))
-                    staleness_reasons="${staleness_reasons}LIKELY_REMOVED: '$term' — most recent commit is removal (${first_removal}) but $active_refs active refs remain. "
-                elif [[ "$active_refs" -le 2 ]]; then
-                    # Removal commits exist with minimal active refs
-                    staleness_signals=$((staleness_signals + 1))
-                    staleness_reasons="${staleness_reasons}MINIMAL: '$term' has removal commits and only $active_refs active references. "
-                fi
+        if [[ -n "$newest_commit" ]]; then
+            if printf '%s' "$newest_commit" \
+                | grep -qiE "remov|delet|drop|deprecat|clean.?up"; then
+                newest_commit_is_removal=true
             fi
-        done <<< "$all_terms"
-    fi
+        fi
 
-    # --- Signal 2: Extract file paths and check existence ---
+        local active_refs=0
+        if [[ "$codebase_refs" -gt 0 ]]; then
+            active_refs=$(git -C "$project_root" grep -rn "$term" \
+                -- '*.sh' '*.md' '*.mjs' '*.ts' '*.json' 2>/dev/null \
+                | grep -v 'TODO.md\|CHANGELOG.md\|VERIFY.md\|PLANS.md\|verification\|todo/' \
+                | grep -icv 'remov\|delet\|deprecat\|clean.up\|no longer\|was removed\|dropped\|legacy\|historical\|formerly\|previously\|used to\|compat\|detect\|OMOC\|Phase 0' \
+                2>/dev/null) || true
+        fi
+
+        local first_removal=""
+        first_removal=$(printf '%s' "$removal_commits" | head -1)
+
+        if [[ "$newest_commit_is_removal" == "true" && "$active_refs" -eq 0 ]]; then
+            eval "${_signals_var}=\$(( \${${_signals_var}} + 3 ))"
+            eval "${_reasons_var}=\"\${${_reasons_var}}REMOVED: '$term' — most recent commit is a removal (${first_removal}), 0 active refs. \""
+        elif [[ "$active_refs" -eq 0 ]]; then
+            eval "${_signals_var}=\$(( \${${_signals_var}} + 3 ))"
+            eval "${_reasons_var}=\"\${${_reasons_var}}REMOVED: '$term' was removed (${first_removal}) with 0 active codebase references. \""
+        elif [[ "$newest_commit_is_removal" == "true" ]]; then
+            eval "${_signals_var}=\$(( \${${_signals_var}} + 2 ))"
+            eval "${_reasons_var}=\"\${${_reasons_var}}LIKELY_REMOVED: '$term' — most recent commit is removal (${first_removal}) but $active_refs active refs remain. \""
+        elif [[ "$active_refs" -le 2 ]]; then
+            eval "${_signals_var}=\$(( \${${_signals_var}} + 1 ))"
+            eval "${_reasons_var}=\"\${${_reasons_var}}MINIMAL: '$term' has removal commits and only $active_refs active references. \""
+        fi
+    done <<< "$all_terms"
+
+    return 0
+}
+
+#######################################
+# _staleness_check_missing_files — Signal 2
+# Check referenced file paths for existence in git index.
+# Arguments:
+#   $1 - task_description
+#   $2 - project_root
+#   $3 - name of integer variable to accumulate signals into
+#   $4 - name of string variable to accumulate reasons into
+# Returns: 0 always
+#######################################
+_staleness_check_missing_files() {
+    local task_description="$1"
+    local project_root="$2"
+    local _signals_var="$3"
+    local _reasons_var="$4"
+
     local file_refs=""
     file_refs=$(printf '%s' "$task_description" \
         | grep -oE '[a-zA-Z0-9_/-]+\.[a-z]{1,4}' \
         | grep -vE '^\.' \
         | sort -u) || true
 
-    if [[ -n "$file_refs" ]]; then
-        local missing_files=0
-        local total_files=0
-        while IFS= read -r file_ref; do
-            [[ -z "$file_ref" ]] && continue
-            total_files=$((total_files + 1))
+    [[ -z "$file_refs" ]] && return 0
 
-            # Check if file exists in git index
-            if ! git -C "$project_root" ls-files --error-unmatch "$file_ref" \
-                &>/dev/null 2>&1; then
-                # Try with common prefixes
-                local found=false
-                for prefix in ".agents/" ".agents/scripts/" ".agents/tools/" ""; do
-                    if git -C "$project_root" ls-files --error-unmatch \
-                        "${prefix}${file_ref}" &>/dev/null 2>&1; then
-                        found=true
-                        break
-                    fi
-                done
-                if [[ "$found" == "false" ]]; then
-                    missing_files=$((missing_files + 1))
+    local missing_files=0
+    local total_files=0
+    while IFS= read -r file_ref; do
+        [[ -z "$file_ref" ]] && continue
+        total_files=$((total_files + 1))
+
+        if ! git -C "$project_root" ls-files --error-unmatch "$file_ref" \
+            &>/dev/null 2>&1; then
+            local found=false
+            for prefix in ".agents/" ".agents/scripts/" ".agents/tools/" ""; do
+                if git -C "$project_root" ls-files --error-unmatch \
+                    "${prefix}${file_ref}" &>/dev/null 2>&1; then
+                    found=true
+                    break
                 fi
+            done
+            if [[ "$found" == "false" ]]; then
+                missing_files=$((missing_files + 1))
             fi
-        done <<< "$file_refs"
+        fi
+    done <<< "$file_refs"
 
-        if [[ "$total_files" -gt 0 && "$missing_files" -gt 0 ]]; then
-            local missing_pct=$((missing_files * 100 / total_files))
-            if [[ "$missing_pct" -ge 50 ]]; then
-                staleness_signals=$((staleness_signals + 2))
-                staleness_reasons="${staleness_reasons}MISSING_FILES: $missing_files/$total_files referenced files not found. "
-            fi
+    if [[ "$total_files" -gt 0 && "$missing_files" -gt 0 ]]; then
+        local missing_pct=$((missing_files * 100 / total_files))
+        if [[ "$missing_pct" -ge 50 ]]; then
+            eval "${_signals_var}=\$(( \${${_signals_var}} + 2 ))"
+            eval "${_reasons_var}=\"\${${_reasons_var}}MISSING_FILES: $missing_files/$total_files referenced files not found. \""
         fi
     fi
 
-    # --- Signal 3: Check if task's parent feature was already removed ---
+    return 0
+}
+
+#######################################
+# _staleness_check_parent_removed — Signal 3
+# Check if a subtask's parent feature was already removed.
+# Arguments:
+#   $1 - task_id
+#   $2 - project_root
+#   $3 - name of integer variable to accumulate signals into
+#   $4 - name of string variable to accumulate reasons into
+# Returns: 0 always
+#######################################
+_staleness_check_parent_removed() {
+    local task_id="$1"
+    local project_root="$2"
+    local _signals_var="$3"
+    local _reasons_var="$4"
+
     local parent_id=""
     if [[ "$task_id" =~ ^(t[0-9]+)\.[0-9]+$ ]]; then
         parent_id="${BASH_REMATCH[1]}"
@@ -206,12 +231,30 @@ check_task_staleness() {
             | head -1) || true
 
         if [[ -n "$parent_removal" ]]; then
-            staleness_signals=$((staleness_signals + 1))
-            staleness_reasons="${staleness_reasons}PARENT_REMOVED: Parent $parent_id has removal commits: $parent_removal. "
+            eval "${_signals_var}=\$(( \${${_signals_var}} + 1 ))"
+            eval "${_reasons_var}=\"\${${_reasons_var}}PARENT_REMOVED: Parent $parent_id has removal commits: $parent_removal. \""
         fi
     fi
 
-    # --- Signal 4: Check for contradicting "already done" patterns ---
+    return 0
+}
+
+#######################################
+# _staleness_check_already_done — Signal 4
+# Check for "already done" patterns via implementation commits.
+# Arguments:
+#   $1 - task_description
+#   $2 - project_root
+#   $3 - name of integer variable to accumulate signals into
+#   $4 - name of string variable to accumulate reasons into
+# Returns: 0 always
+#######################################
+_staleness_check_already_done() {
+    local task_description="$1"
+    local project_root="$2"
+    local _signals_var="$3"
+    local _reasons_var="$4"
+
     local task_verb=""
     task_verb=$(printf '%s' "$task_description" \
         | grep -oE '^(add|create|implement|build|set up|integrate|fix|resolve)' \
@@ -230,11 +273,42 @@ check_task_staleness() {
                 | grep -icE "add|creat|implement|built|integrat" 2>/dev/null) || true
 
             if [[ "$existing_refs" -ge 2 ]]; then
-                staleness_signals=$((staleness_signals + 1))
-                staleness_reasons="${staleness_reasons}POSSIBLY_DONE: '$subject' has $existing_refs existing implementation commits. "
+                eval "${_signals_var}=\$(( \${${_signals_var}} + 1 ))"
+                eval "${_reasons_var}=\"\${${_reasons_var}}POSSIBLY_DONE: '$subject' has $existing_refs existing implementation commits. \""
             fi
         fi
     fi
+
+    return 0
+}
+
+check_task_staleness() {
+    local task_id="${1:-}"
+    local task_description="${2:-}"
+    local project_root="${3:-.}"
+
+    if [[ -z "$task_id" || -z "$task_description" ]]; then
+        return 1  # Can't check without description — assume current
+    fi
+
+    local staleness_signals=0
+    local staleness_reasons=""
+
+    # Signal 1: feature/tool names removed from codebase
+    _staleness_check_removal_signals \
+        "$task_description" "$project_root" staleness_signals staleness_reasons
+
+    # Signal 2: referenced file paths missing from git index
+    _staleness_check_missing_files \
+        "$task_description" "$project_root" staleness_signals staleness_reasons
+
+    # Signal 3: subtask whose parent feature was removed
+    _staleness_check_parent_removed \
+        "$task_id" "$project_root" staleness_signals staleness_reasons
+
+    # Signal 4: task describes work that already has implementation commits
+    _staleness_check_already_done \
+        "$task_description" "$project_root" staleness_signals staleness_reasons
 
     # --- Decision: three-tier threshold ---
     # Score >= 3 = STALE — clearly outdated (cancel)

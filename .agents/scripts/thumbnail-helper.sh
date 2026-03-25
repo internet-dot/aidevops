@@ -440,23 +440,16 @@ cmd_generate() {
 # Thumbnail Scoring
 # =============================================================================
 
-# Score a single thumbnail on quality criteria
-cmd_score() {
+# Print image dimensions and file size info
+_score_check_dimensions() {
 	local image_path="$1"
 
-	validate_required_param "image_path" "$image_path" || return 1
-	validate_file_exists "$image_path" "Thumbnail image" || return 1
-
-	print_info "Scoring thumbnail: $image_path"
-
-	# Check image dimensions
 	if command -v identify >/dev/null 2>&1; then
 		local dimensions
 		dimensions=$(identify -format "%wx%h" "$image_path" 2>/dev/null || echo "unknown")
 		print_info "Dimensions: $dimensions (recommended: ${THUMBNAIL_WIDTH}x${THUMBNAIL_HEIGHT})"
 	fi
 
-	# Check file size
 	local file_size_mb
 	if [[ "$OSTYPE" == "darwin"* ]]; then
 		file_size_mb=$(stat -f%z "$image_path" | awk '{print $1/1024/1024}')
@@ -465,7 +458,13 @@ cmd_score() {
 	fi
 	print_info "File size: ${file_size_mb}MB (max: ${THUMBNAIL_MAX_SIZE_MB}MB)"
 
-	# Manual scoring rubric
+	return 0
+}
+
+# Prompt user for each scoring criterion.
+# Sets face_score, contrast_score, text_space_score, brand_score,
+# emotion_score, clarity_score in the caller's scope via read.
+_score_collect_ratings() {
 	echo ""
 	print_info "Score this thumbnail on the following criteria (1-10 scale):"
 	echo ""
@@ -498,9 +497,21 @@ cmd_score() {
 	echo "   - Is it readable at small sizes (320px)?"
 	read -r -p "   Score (1-10): " clarity_score
 
-	# Calculate weighted score
-	local weighted_score
-	weighted_score=$(awk "BEGIN {
+	return 0
+}
+
+# Calculate weighted score from individual criterion scores.
+# Arguments: face contrast text_space brand emotion clarity
+# Outputs weighted score to stdout.
+_score_calculate_weighted() {
+	local face_score="$1"
+	local contrast_score="$2"
+	local text_space_score="$3"
+	local brand_score="$4"
+	local emotion_score="$5"
+	local clarity_score="$6"
+
+	awk "BEGIN {
         score = ($face_score * 0.25) + \
                 ($contrast_score * 0.20) + \
                 ($text_space_score * 0.15) + \
@@ -508,18 +519,23 @@ cmd_score() {
                 ($emotion_score * 0.15) + \
                 ($clarity_score * 0.10);
         printf \"%.2f\", score
-    }")
+    }"
 
-	echo ""
-	print_info "Weighted Score: $weighted_score / 10"
+	return 0
+}
 
-	if (($(echo "$weighted_score >= $MIN_SCORE_THRESHOLD" | bc -l))); then
-		print_success "✓ PASS - Score meets threshold (>= $MIN_SCORE_THRESHOLD)"
-	else
-		print_warning "✗ FAIL - Score below threshold (< $MIN_SCORE_THRESHOLD) - regenerate recommended"
-	fi
+# Save score report to a text file alongside the image.
+# Arguments: image_path face contrast text_space brand emotion clarity weighted_score
+_score_save_report() {
+	local image_path="$1"
+	local face_score="$2"
+	local contrast_score="$3"
+	local text_space_score="$4"
+	local brand_score="$5"
+	local emotion_score="$6"
+	local clarity_score="$7"
+	local weighted_score="$8"
 
-	# Save score to file
 	local score_file="${image_path%.png}_score.txt"
 	score_file="${score_file%.jpg}_score.txt"
 	cat >"$score_file" <<EOF
@@ -542,6 +558,42 @@ Status: $(if (($(echo "$weighted_score >= $MIN_SCORE_THRESHOLD" | bc -l))); then
 EOF
 
 	print_info "Score saved to: $score_file"
+
+	return 0
+}
+
+# Score a single thumbnail on quality criteria
+cmd_score() {
+	local image_path="$1"
+
+	validate_required_param "image_path" "$image_path" || return 1
+	validate_file_exists "$image_path" "Thumbnail image" || return 1
+
+	print_info "Scoring thumbnail: $image_path"
+
+	_score_check_dimensions "$image_path"
+
+	local face_score contrast_score text_space_score brand_score emotion_score clarity_score
+	_score_collect_ratings
+
+	local weighted_score
+	weighted_score=$(_score_calculate_weighted \
+		"$face_score" "$contrast_score" "$text_space_score" \
+		"$brand_score" "$emotion_score" "$clarity_score")
+
+	echo ""
+	print_info "Weighted Score: $weighted_score / 10"
+
+	if (($(echo "$weighted_score >= $MIN_SCORE_THRESHOLD" | bc -l))); then
+		print_success "✓ PASS - Score meets threshold (>= $MIN_SCORE_THRESHOLD)"
+	else
+		print_warning "✗ FAIL - Score below threshold (< $MIN_SCORE_THRESHOLD) - regenerate recommended"
+	fi
+
+	_score_save_report "$image_path" \
+		"$face_score" "$contrast_score" "$text_space_score" \
+		"$brand_score" "$emotion_score" "$clarity_score" \
+		"$weighted_score"
 
 	return 0
 }
