@@ -402,6 +402,61 @@ handle_stale_remote_branch() {
 	return 0
 }
 
+# Get worktree age in hours (GH#5694)
+# Uses directory creation time (stat %W birth time, fallback to %Y mtime).
+# Returns age in hours via stdout. Returns 0 (very new) on any failure.
+# Bash 3.2 compatible — no associative arrays or bash 4+ features.
+worktree_age_hours() {
+	local worktree_path="$1"
+	[[ -d "$worktree_path" ]] || {
+		echo "0"
+		return 0
+	}
+
+	local now
+	now=$(date +%s)
+
+	# Try birth time first (ext4/btrfs), fall back to mtime
+	local created
+	created=$(stat -c '%W' "$worktree_path" 2>/dev/null) || created="0"
+	# %W returns 0 or - when birth time is unavailable
+	if [[ "$created" == "0" ]] || [[ "$created" == "-" ]] || [[ -z "$created" ]]; then
+		created=$(stat -c '%Y' "$worktree_path" 2>/dev/null) || created="$now"
+	fi
+
+	local age_seconds
+	age_seconds=$((now - created))
+	local age_hours
+	age_hours=$((age_seconds / 3600))
+	echo "$age_hours"
+	return 0
+}
+
+# Check if branch has an open PR on GitHub (GH#5694)
+# Returns 0 (true) if an open PR exists for the branch, 1 otherwise.
+# Requires gh CLI. Returns 1 (no open PR) if gh is unavailable.
+branch_has_open_pr() {
+	local branch_name="$1"
+	command -v gh &>/dev/null || return 1
+
+	local pr_count
+	pr_count=$(gh pr list --head "$branch_name" --state open --limit 1 --json number --jq 'length' 2>/dev/null) || return 1
+	[[ "${pr_count:-0}" -gt 0 ]]
+}
+
+# Check if branch has zero commits ahead of default branch (GH#5694)
+# Returns 0 (true) if the branch has zero unique commits, 1 otherwise.
+# A branch with 0 commits ahead that also has dirty files is likely
+# in-progress work, not a completed merge.
+branch_has_zero_commits_ahead() {
+	local branch_name="$1"
+	local default_branch="$2"
+
+	local ahead_count
+	ahead_count=$(git rev-list --count "${default_branch}..${branch_name}" 2>/dev/null) || return 1
+	[[ "${ahead_count:-0}" -eq 0 ]]
+}
+
 # Check if worktree has uncommitted changes (GH#3797)
 # Excludes aidevops runtime directories that are safe to discard.
 # Returns 0 (true) if changes exist OR if git status fails (safety-first:
@@ -778,6 +833,13 @@ cmd_switch() {
 
 # Clean up worktrees whose branches have been merged, remote-deleted, or squash-merged.
 # Supports --auto (non-interactive) and --force-merged (skip confirmation for merged).
+#
+# Safety checks (GH#5694):
+#   1. Grace period: worktrees younger than WORKTREE_CLEANUP_GRACE_HOURS are never deleted
+#   2. Open PR check: worktrees with an open PR are never deleted
+#   3. Zero-commit + dirty: branches with 0 commits ahead + dirty files = in-progress, not merged
+readonly WORKTREE_CLEANUP_GRACE_HOURS="${WORKTREE_CLEANUP_GRACE_HOURS:-4}"
+
 cmd_clean() {
 	local auto_mode=false
 	local force_merged=false
@@ -868,6 +930,42 @@ cmd_clean() {
 					echo "    $worktree_path"
 					echo ""
 					is_merged=false
+				fi
+
+				# Grace period check (GH#5694): skip worktrees younger than WORKTREE_CLEANUP_GRACE_HOURS.
+				# A recently-created worktree is likely in-progress work, even if git
+				# considers the branch "merged" (0 commits ahead = identical to default).
+				if [[ "$is_merged" == "true" ]]; then
+					local wt_age_hours
+					wt_age_hours=$(worktree_age_hours "$worktree_path")
+					if [[ "$wt_age_hours" -lt "$WORKTREE_CLEANUP_GRACE_HOURS" ]]; then
+						echo -e "  ${RED}$worktree_branch${NC} (younger than ${WORKTREE_CLEANUP_GRACE_HOURS}h - skipping)"
+						echo "    $worktree_path"
+						echo ""
+						is_merged=false
+					fi
+				fi
+
+				# Open PR check (GH#5694): skip worktrees that have an open PR.
+				# An open PR means the work is actively under review — never delete.
+				if [[ "$is_merged" == "true" ]] && branch_has_open_pr "$worktree_branch"; then
+					echo -e "  ${RED}$worktree_branch${NC} (has open PR - skipping)"
+					echo "    $worktree_path"
+					echo ""
+					is_merged=false
+				fi
+
+				# Zero-commit + dirty check (GH#5694): a branch with 0 commits ahead
+				# of default AND dirty files is in-progress work, not a completed merge.
+				# git branch --merged flags these as "merged" because they're identical
+				# to default — but the dirty files prove work has started.
+				if [[ "$is_merged" == "true" ]] && worktree_has_changes "$worktree_path"; then
+					if branch_has_zero_commits_ahead "$worktree_branch" "$default_branch"; then
+						echo -e "  ${RED}$worktree_branch${NC} (0 commits ahead + dirty files = in-progress - skipping)"
+						echo "    $worktree_path"
+						echo ""
+						is_merged=false
+					fi
 				fi
 
 				# Dirty check: behaviour depends on --force-merged flag
@@ -1105,7 +1203,13 @@ COMMANDS
                          --force-merged: force-remove dirty worktrees when PR is
                            confirmed merged (dirty state = abandoned WIP). Also
                            detects squash merges via gh pr list.
-                         Skips worktrees owned by other active sessions (t189)
+                         Safety checks (GH#5694):
+                           - Skips worktrees owned by other active sessions (t189)
+                           - Skips worktrees younger than WORKTREE_CLEANUP_GRACE_HOURS
+                             (default 4h, configurable via env var)
+                           - Skips worktrees with an open PR
+                           - Skips branches with 0 commits ahead + dirty files
+                             (in-progress work, not a completed merge)
   
   registry [list|prune]  View or prune the ownership registry (t189, t197)
                          list: Show all registered worktrees with ownership info
