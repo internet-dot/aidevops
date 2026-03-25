@@ -137,8 +137,15 @@ setup_supervisor_pulse() {
 		_uninstall_pulse "$_os" "$pulse_label"
 	fi
 
-	# Export for use by setup_stats_wrapper
+	# Export effective pulse state for setup_stats_wrapper.
+	# Use the actual install decision (_do_install), not just the consent string,
+	# so stats wrapper tracks the real scheduler state (e.g., wrapper missing → false).
 	PULSE_CONSENT_LOWER="$_pulse_lower"
+	if [[ "$_do_install" == "true" ]]; then
+		PULSE_ENABLED="true"
+	else
+		PULSE_ENABLED="false"
+	fi
 	return 0
 }
 
@@ -268,7 +275,7 @@ _install_pulse_cron() {
 		_cron_headless_env+=" AIDEVOPS_HEADLESS_PROVIDER_ALLOWLIST=${_cron_headless_allowlist}"
 	fi
 	(
-		crontab -l 2>/dev/null | grep -v 'aidevops: supervisor-pulse'
+		crontab -l 2>/dev/null | grep -v 'aidevops: supervisor-pulse' || true
 		echo "*/2 * * * * PULSE_DIR=${_cron_pulse_dir}${_cron_headless_env} /bin/bash ${_cron_wrapper_script} >> \"\$HOME/.aidevops/logs/pulse-wrapper.log\" 2>&1 # aidevops: supervisor-pulse"
 	) | crontab - || true
 	if crontab -l 2>/dev/null | grep -qF "aidevops: supervisor-pulse"; then
@@ -305,9 +312,12 @@ _uninstall_pulse() {
 # pulse is enabled (stats are useless without it).
 setup_stats_wrapper() {
 	local _pulse_lower="$1"
+	# Use effective pulse state (PULSE_ENABLED) if available; fall back to consent string.
+	# PULSE_ENABLED reflects the actual install decision (e.g., false when wrapper is missing).
+	local _pulse_effective="${PULSE_ENABLED:-$_pulse_lower}"
 	local stats_script="$HOME/.aidevops/agents/scripts/stats-wrapper.sh"
 	local stats_label="com.aidevops.aidevops-stats-wrapper"
-	if [[ -x "$stats_script" ]] && [[ "$_pulse_lower" == "true" ]]; then
+	if [[ -x "$stats_script" ]] && [[ "$_pulse_effective" == "true" ]]; then
 		# Always regenerate to pick up config/format changes (matches pulse behavior)
 		if [[ "$(uname -s)" == "Darwin" ]]; then
 			local stats_plist="$HOME/Library/LaunchAgents/${stats_label}.plist"
@@ -360,14 +370,14 @@ PLIST
 			local _cron_stats_script
 			_cron_stats_script=$(_cron_escape "$stats_script")
 			(
-				crontab -l 2>/dev/null | grep -v 'aidevops: stats-wrapper'
+				crontab -l 2>/dev/null | grep -v 'aidevops: stats-wrapper' || true
 				echo "*/15 * * * * /bin/bash ${_cron_stats_script} >> \"\$HOME/.aidevops/logs/stats.log\" 2>&1 # aidevops: stats-wrapper"
 			) | crontab - || true
 			if crontab -l 2>/dev/null | grep -qF "aidevops: stats-wrapper"; then
 				print_info "Stats wrapper enabled (cron, every 15 min)"
 			fi
 		fi
-	elif [[ "$_pulse_lower" == "false" ]]; then
+	elif [[ "$_pulse_effective" == "false" ]]; then
 		# Remove stats scheduler if pulse is disabled
 		if [[ "$(uname -s)" == "Darwin" ]]; then
 			local stats_plist="$HOME/Library/LaunchAgents/${stats_label}.plist"
@@ -466,7 +476,7 @@ GUARD_PLIST
 		local _cron_guard_script
 		_cron_guard_script=$(_cron_escape "$guard_script")
 		(
-			crontab -l 2>/dev/null | grep -v 'aidevops: process-guard'
+			crontab -l 2>/dev/null | grep -v 'aidevops: process-guard' || true
 			echo "* * * * * SHELLCHECK_RSS_LIMIT_KB=524288 SHELLCHECK_RUNTIME_LIMIT=120 CHILD_RSS_LIMIT_KB=8388608 CHILD_RUNTIME_LIMIT=7200 /bin/bash ${_cron_guard_script} kill-runaways >> \"\$HOME/.aidevops/logs/process-guard.log\" 2>&1 # aidevops: process-guard"
 		) | crontab - || true
 		if crontab -l 2>/dev/null | grep -qF "aidevops: process-guard"; then
@@ -550,7 +560,7 @@ MONITOR_PLIST
 	else
 		# Linux: cron entry (every minute — cron minimum granularity)
 		(
-			crontab -l 2>/dev/null | grep -v 'aidevops: memory-pressure-monitor'
+			crontab -l 2>/dev/null | grep -v 'aidevops: memory-pressure-monitor' || true
 			echo "* * * * * /bin/bash \"${monitor_script}\" >> \"\$HOME/.aidevops/logs/memory-pressure-launchd.log\" 2>&1 # aidevops: memory-pressure-monitor"
 		) | crontab - 2>/dev/null || true
 		if crontab -l 2>/dev/null | grep -qF "aidevops: memory-pressure-monitor" 2>/dev/null; then
@@ -636,7 +646,7 @@ ST_PLIST
 		local _cron_st_script
 		_cron_st_script=$(_cron_escape "$st_script")
 		(
-			crontab -l 2>/dev/null | grep -v 'aidevops: screen-time-snapshot'
+			crontab -l 2>/dev/null | grep -v 'aidevops: screen-time-snapshot' || true
 			echo "0 */6 * * * /bin/bash ${_cron_st_script} snapshot >> \"\$HOME/.aidevops/.agent-workspace/logs/screen-time-snapshot.log\" 2>&1 # aidevops: screen-time-snapshot"
 		) | crontab - 2>/dev/null || true
 		if crontab -l 2>/dev/null | grep -qF "aidevops: screen-time-snapshot" 2>/dev/null; then
@@ -748,11 +758,12 @@ CW_PLIST
 		fi
 	else
 		# Linux: cron entry (hourly)
-		local _cron_cw_script
+		local _cron_cw_script _cron_cw_log_dir
 		_cron_cw_script=$(_cron_escape "$cw_script")
+		_cron_cw_log_dir=$(_cron_escape "$_cw_log_dir")
 		(
-			crontab -l 2>/dev/null | grep -v 'aidevops: contribution-watch'
-			echo "0 * * * * /bin/bash ${_cron_cw_script} scan >> \"${_cw_log_dir}/contribution-watch.log\" 2>&1 # aidevops: contribution-watch"
+			crontab -l 2>/dev/null | grep -v 'aidevops: contribution-watch' || true
+			echo "0 * * * * /bin/bash ${_cron_cw_script} scan >> \"${_cron_cw_log_dir}/contribution-watch.log\" 2>&1 # aidevops: contribution-watch"
 		) | crontab - 2>/dev/null || true
 		if crontab -l 2>/dev/null | grep -qF "aidevops: contribution-watch" 2>/dev/null; then
 			print_info "Contribution watch enabled (cron, hourly scan)"
@@ -869,7 +880,7 @@ PR_PLIST
 		local _cron_pr_script
 		_cron_pr_script=$(_cron_escape "$pr_script")
 		(
-			crontab -l 2>/dev/null | grep -v 'aidevops: profile-readme-update'
+			crontab -l 2>/dev/null | grep -v 'aidevops: profile-readme-update' || true
 			echo "0 * * * * /bin/bash ${_cron_pr_script} update >> \"\$HOME/.aidevops/.agent-workspace/logs/profile-readme-update.log\" 2>&1 # aidevops: profile-readme-update"
 		) | crontab - 2>/dev/null || true
 		if crontab -l 2>/dev/null | grep -qF "aidevops: profile-readme-update" 2>/dev/null; then
@@ -954,7 +965,7 @@ TR_PLIST
 		local _cron_tr_script
 		_cron_tr_script=$(_cron_escape "$tr_script")
 		(
-			crontab -l 2>/dev/null | grep -v 'aidevops: token-refresh'
+			crontab -l 2>/dev/null | grep -v 'aidevops: token-refresh' || true
 			echo "*/30 * * * * /bin/bash ${_cron_tr_script} refresh anthropic >> \"\$HOME/.aidevops/.agent-workspace/logs/token-refresh.log\" 2>&1; /bin/bash ${_cron_tr_script} refresh openai >> \"\$HOME/.aidevops/.agent-workspace/logs/token-refresh.log\" 2>&1 # aidevops: token-refresh"
 		) | crontab - 2>/dev/null || true
 		if crontab -l 2>/dev/null | grep -qF "aidevops: token-refresh" 2>/dev/null; then
