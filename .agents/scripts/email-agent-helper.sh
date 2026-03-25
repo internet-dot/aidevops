@@ -306,196 +306,71 @@ extract_template_body() {
 }
 
 # ============================================================================
-# Send command
+# Send command — sub-functions
 # ============================================================================
 
-cmd_send() {
-	local mission_id="" to_email="" template_file="" vars_string=""
-	local subject="" body="" from_email="" reply_to_msg=""
+# Record an outbound message and mark conversation as waiting.
+# Args: msg_id conv_id mission_id from_email to_email subject body ses_result [in_reply_to]
+_send_record_message() {
+	local msg_id="$1" conv_id="$2" mission_id="$3"
+	local from_email="$4" to_email="$5" subject="$6" body="$7" ses_result="$8"
+	local in_reply_to="${9:-}"
 
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
-		--mission)
-			[[ $# -lt 2 ]] && {
-				print_error "--mission requires a value"
-				return 1
-			}
-			mission_id="$2"
-			shift 2
-			;;
-		--to)
-			[[ $# -lt 2 ]] && {
-				print_error "--to requires a value"
-				return 1
-			}
-			to_email="$2"
-			shift 2
-			;;
-		--template)
-			[[ $# -lt 2 ]] && {
-				print_error "--template requires a value"
-				return 1
-			}
-			template_file="$2"
-			shift 2
-			;;
-		--vars)
-			[[ $# -lt 2 ]] && {
-				print_error "--vars requires a value"
-				return 1
-			}
-			vars_string="$2"
-			shift 2
-			;;
-		--subject)
-			[[ $# -lt 2 ]] && {
-				print_error "--subject requires a value"
-				return 1
-			}
-			subject="$2"
-			shift 2
-			;;
-		--body)
-			[[ $# -lt 2 ]] && {
-				print_error "--body requires a value"
-				return 1
-			}
-			body="$2"
-			shift 2
-			;;
-		--from)
-			[[ $# -lt 2 ]] && {
-				print_error "--from requires a value"
-				return 1
-			}
-			from_email="$2"
-			shift 2
-			;;
-		--reply-to)
-			[[ $# -lt 2 ]] && {
-				print_error "--reply-to requires a value"
-				return 1
-			}
-			reply_to_msg="$2"
-			shift 2
-			;;
-		*)
-			print_error "Unknown option: $1"
-			return 1
-			;;
-		esac
-	done
+	local reply_col="" reply_val=""
+	if [[ -n "$in_reply_to" ]]; then
+		reply_col=", in_reply_to"
+		reply_val=", '$(sql_escape "$in_reply_to")'"
+	fi
 
-	# Validate required fields
-	if [[ -z "$mission_id" ]]; then
-		print_error "Mission ID is required (--mission M001)"
+	db "$DB_FILE" "
+		INSERT INTO messages (id, conv_id, mission_id, direction, from_email, to_email, subject, body_text, ses_message_id${reply_col})
+		VALUES ('$(sql_escape "$msg_id")', '$(sql_escape "$conv_id")', '$(sql_escape "$mission_id")', 'outbound', '$(sql_escape "$from_email")', '$(sql_escape "$to_email")', '$(sql_escape "$subject")', '$(sql_escape "$body")', '$(sql_escape "$ses_result")'${reply_val});
+	"
+
+	db "$DB_FILE" "
+		UPDATE conversations SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now'), status = 'waiting'
+		WHERE id = '$(sql_escape "$conv_id")';
+	"
+	return 0
+}
+
+# Send a reply using SES send-raw-email (supports In-Reply-To/References headers).
+# Returns 0 on success, 1 on failure. Prints msg_id on success.
+_send_reply() {
+	local conv_id="$1" mission_id="$2" from_email="$3" to_email="$4"
+	local subject="$5" body="$6" original_message_id="$7"
+
+	local raw_message
+	raw_message=$(printf 'From: %s\r\nTo: %s\r\nSubject: %s\r\nIn-Reply-To: %s\r\nReferences: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s' \
+		"$from_email" "$to_email" "$subject" "$original_message_id" "$original_message_id" "$body")
+
+	local encoded_message
+	encoded_message=$(printf '%s' "$raw_message" | base64 | tr -d '\n')
+
+	local ses_result
+	ses_result=$(aws ses send-raw-email \
+		--raw-message "Data=$encoded_message" \
+		--query 'MessageId' --output text 2>&1) || {
+		print_error "Failed to send email: $ses_result"
 		return 1
-	fi
-	if [[ -z "$to_email" ]]; then
-		print_error "Recipient email is required (--to user@example.com)"
-		return 1
-	fi
+	}
 
-	check_dependencies || return 1
-	load_config || return 1
-	set_aws_credentials || return 1
-	ensure_db
+	local msg_id
+	msg_id=$(generate_id "msg")
+	_send_record_message "$msg_id" "$conv_id" "$mission_id" \
+		"$from_email" "$to_email" "$subject" "$body" "$ses_result" "$original_message_id"
 
-	# Resolve from address
-	if [[ -z "$from_email" ]]; then
-		from_email=$(get_config_value '.default_from_email' '')
-		if [[ -z "$from_email" ]]; then
-			print_error "No from address. Set --from or configure default_from_email in config"
-			return 1
-		fi
-	fi
+	print_success "Sent reply: $msg_id (SES: $ses_result) in conversation $conv_id"
+	echo "$msg_id"
+	return 0
+}
 
-	# Process template or direct subject/body
-	if [[ -n "$template_file" ]]; then
-		local rendered
-		rendered=$(render_template "$template_file" "$vars_string")
-		if [[ -z "$subject" ]]; then
-			subject=$(echo "$rendered" | grep -m1 '^Subject: ' | sed 's/^Subject: //' || echo "Mission $mission_id Communication")
-		fi
-		if [[ -z "$body" ]]; then
-			body=$(extract_template_body "$rendered")
-		fi
-	fi
+# Send a standard (non-reply) email via SES send-email.
+# Returns 0 on success, 1 on failure. Prints msg_id on success.
+_send_standard() {
+	local conv_id="$1" mission_id="$2" from_email="$3" to_email="$4"
+	local subject="$5" body="$6"
 
-	if [[ -z "$subject" ]]; then
-		print_error "Subject is required (--subject or template with Subject: header)"
-		return 1
-	fi
-	if [[ -z "$body" ]]; then
-		print_error "Body is required (--body or --template)"
-		return 1
-	fi
-
-	# Find or create conversation
-	local conv_id=""
-	if [[ -n "$reply_to_msg" ]]; then
-		# Find conversation by message reference
-		conv_id=$(db "$DB_FILE" "
-			SELECT conv_id FROM messages
-			WHERE message_id = '$(sql_escape "$reply_to_msg")' OR id = '$(sql_escape "$reply_to_msg")'
-			LIMIT 1;
-		")
-	fi
-
-	if [[ -z "$conv_id" ]]; then
-		conv_id=$(generate_id "conv")
-		db "$DB_FILE" "
-			INSERT INTO conversations (id, mission_id, subject, to_email, from_email, status)
-			VALUES ('$(sql_escape "$conv_id")', '$(sql_escape "$mission_id")', '$(sql_escape "$subject")', '$(sql_escape "$to_email")', '$(sql_escape "$from_email")', 'active');
-		"
-	fi
-
-	# Add In-Reply-To header if replying
-	if [[ -n "$reply_to_msg" ]]; then
-		local original_message_id
-		original_message_id=$(db "$DB_FILE" "
-			SELECT message_id FROM messages
-			WHERE id = '$(sql_escape "$reply_to_msg")' OR message_id = '$(sql_escape "$reply_to_msg")'
-			LIMIT 1;
-		")
-		if [[ -n "$original_message_id" ]]; then
-			# SES doesn't support custom headers in basic send-email
-			# Use send-raw-email for threading headers
-			local raw_message
-			raw_message=$(printf 'From: %s\r\nTo: %s\r\nSubject: %s\r\nIn-Reply-To: %s\r\nReferences: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s' \
-				"$from_email" "$to_email" "$subject" "$original_message_id" "$original_message_id" "$body")
-
-			local encoded_message
-			encoded_message=$(printf '%s' "$raw_message" | base64 | tr -d '\n')
-
-			local ses_result
-			ses_result=$(aws ses send-raw-email \
-				--raw-message "Data=$encoded_message" \
-				--query 'MessageId' --output text 2>&1) || {
-				print_error "Failed to send email: $ses_result"
-				return 1
-			}
-
-			local msg_id
-			msg_id=$(generate_id "msg")
-			db "$DB_FILE" "
-				INSERT INTO messages (id, conv_id, mission_id, direction, from_email, to_email, subject, body_text, ses_message_id, in_reply_to)
-				VALUES ('$(sql_escape "$msg_id")', '$(sql_escape "$conv_id")', '$(sql_escape "$mission_id")', 'outbound', '$(sql_escape "$from_email")', '$(sql_escape "$to_email")', '$(sql_escape "$subject")', '$(sql_escape "$body")', '$(sql_escape "$ses_result")', '$(sql_escape "$original_message_id")');
-			"
-
-			# Update conversation timestamp
-			db "$DB_FILE" "
-				UPDATE conversations SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now'), status = 'waiting'
-				WHERE id = '$(sql_escape "$conv_id")';
-			"
-
-			print_success "Sent reply: $msg_id (SES: $ses_result) in conversation $conv_id"
-			echo "$msg_id"
-			return 0
-		fi
-	fi
-
-	# Standard send — build JSON input for safe escaping of all characters
 	local ses_input_json ses_tmpfile
 	ses_input_json=$(jq -n \
 		--arg from "$from_email" \
@@ -525,19 +400,254 @@ cmd_send() {
 
 	local msg_id
 	msg_id=$(generate_id "msg")
-	db "$DB_FILE" "
-		INSERT INTO messages (id, conv_id, mission_id, direction, from_email, to_email, subject, body_text, ses_message_id)
-		VALUES ('$(sql_escape "$msg_id")', '$(sql_escape "$conv_id")', '$(sql_escape "$mission_id")', 'outbound', '$(sql_escape "$from_email")', '$(sql_escape "$to_email")', '$(sql_escape "$subject")', '$(sql_escape "$body")', '$(sql_escape "$ses_result")');
-	"
-
-	# Update conversation to waiting for response
-	db "$DB_FILE" "
-		UPDATE conversations SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now'), status = 'waiting'
-		WHERE id = '$(sql_escape "$conv_id")';
-	"
+	_send_record_message "$msg_id" "$conv_id" "$mission_id" \
+		"$from_email" "$to_email" "$subject" "$body" "$ses_result"
 
 	print_success "Sent: $msg_id (SES: $ses_result) in conversation $conv_id"
 	echo "$msg_id"
+	return 0
+}
+
+# Find an existing conversation by reply reference, or create a new one.
+# Prints the conv_id.
+_send_find_or_create_conversation() {
+	local mission_id="$1" to_email="$2" from_email="$3"
+	local subject="$4" reply_to_msg="$5"
+
+	local conv_id=""
+	if [[ -n "$reply_to_msg" ]]; then
+		conv_id=$(db "$DB_FILE" "
+			SELECT conv_id FROM messages
+			WHERE message_id = '$(sql_escape "$reply_to_msg")' OR id = '$(sql_escape "$reply_to_msg")'
+			LIMIT 1;
+		")
+	fi
+
+	if [[ -z "$conv_id" ]]; then
+		conv_id=$(generate_id "conv")
+		db "$DB_FILE" "
+			INSERT INTO conversations (id, mission_id, subject, to_email, from_email, status)
+			VALUES ('$(sql_escape "$conv_id")', '$(sql_escape "$mission_id")', '$(sql_escape "$subject")', '$(sql_escape "$to_email")', '$(sql_escape "$from_email")', 'active');
+		"
+	fi
+
+	echo "$conv_id"
+	return 0
+}
+
+# ============================================================================
+# Send command
+# ============================================================================
+
+cmd_send() {
+	local mission_id="" to_email="" template_file="" vars_string=""
+	local subject="" body="" from_email="" reply_to_msg=""
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--mission)  [[ $# -lt 2 ]] && { print_error "--mission requires a value"; return 1; }; mission_id="$2"; shift 2 ;;
+		--to)       [[ $# -lt 2 ]] && { print_error "--to requires a value"; return 1; }; to_email="$2"; shift 2 ;;
+		--template) [[ $# -lt 2 ]] && { print_error "--template requires a value"; return 1; }; template_file="$2"; shift 2 ;;
+		--vars)     [[ $# -lt 2 ]] && { print_error "--vars requires a value"; return 1; }; vars_string="$2"; shift 2 ;;
+		--subject)  [[ $# -lt 2 ]] && { print_error "--subject requires a value"; return 1; }; subject="$2"; shift 2 ;;
+		--body)     [[ $# -lt 2 ]] && { print_error "--body requires a value"; return 1; }; body="$2"; shift 2 ;;
+		--from)     [[ $# -lt 2 ]] && { print_error "--from requires a value"; return 1; }; from_email="$2"; shift 2 ;;
+		--reply-to) [[ $# -lt 2 ]] && { print_error "--reply-to requires a value"; return 1; }; reply_to_msg="$2"; shift 2 ;;
+		*) print_error "Unknown option: $1"; return 1 ;;
+		esac
+	done
+
+	[[ -z "$mission_id" ]] && { print_error "Mission ID is required (--mission M001)"; return 1; }
+	[[ -z "$to_email" ]] && { print_error "Recipient email is required (--to user@example.com)"; return 1; }
+
+	check_dependencies || return 1
+	load_config || return 1
+	set_aws_credentials || return 1
+	ensure_db
+
+	# Resolve from address
+	if [[ -z "$from_email" ]]; then
+		from_email=$(get_config_value '.default_from_email' '')
+		[[ -z "$from_email" ]] && { print_error "No from address. Set --from or configure default_from_email in config"; return 1; }
+	fi
+
+	# Process template or direct subject/body
+	if [[ -n "$template_file" ]]; then
+		local rendered
+		rendered=$(render_template "$template_file" "$vars_string")
+		[[ -z "$subject" ]] && subject=$(echo "$rendered" | grep -m1 '^Subject: ' | sed 's/^Subject: //' || echo "Mission $mission_id Communication")
+		[[ -z "$body" ]] && body=$(extract_template_body "$rendered")
+	fi
+
+	[[ -z "$subject" ]] && { print_error "Subject is required (--subject or template with Subject: header)"; return 1; }
+	[[ -z "$body" ]] && { print_error "Body is required (--body or --template)"; return 1; }
+
+	# Find or create conversation
+	local conv_id
+	conv_id=$(_send_find_or_create_conversation "$mission_id" "$to_email" "$from_email" "$subject" "$reply_to_msg")
+
+	# Reply path: use send-raw-email for In-Reply-To/References headers
+	if [[ -n "$reply_to_msg" ]]; then
+		local original_message_id
+		original_message_id=$(db "$DB_FILE" "
+			SELECT message_id FROM messages WHERE id = '$(sql_escape "$reply_to_msg")' OR message_id = '$(sql_escape "$reply_to_msg")' LIMIT 1;
+		")
+		if [[ -n "$original_message_id" ]]; then
+			_send_reply "$conv_id" "$mission_id" "$from_email" "$to_email" "$subject" "$body" "$original_message_id"
+			return $?
+		fi
+	fi
+
+	# Standard send path
+	_send_standard "$conv_id" "$mission_id" "$from_email" "$to_email" "$subject" "$body"
+	return $?
+}
+
+# ============================================================================
+# Poll command — sub-functions
+# ============================================================================
+
+# Parse email fields from a downloaded .eml file.
+# Uses python3 email-to-markdown.py if available, falls back to grep.
+# Prints pipe-separated: from|to|subject|message_id|in_reply_to|body_text
+_poll_parse_email_fields() {
+	local local_file="$1"
+
+	local parsed_json=""
+	if [[ -x "$EMAIL_TO_MD_SCRIPT" ]] && command -v python3 &>/dev/null; then
+		parsed_json=$(python3 "$EMAIL_TO_MD_SCRIPT" "$local_file" --json 2>/dev/null || echo "")
+	fi
+
+	local from_addr="" to_addr="" subj="" msg_id_header="" in_reply_to="" body_text=""
+	if [[ -n "$parsed_json" ]]; then
+		from_addr=$(echo "$parsed_json" | jq -r '.from // empty' 2>/dev/null)
+		to_addr=$(echo "$parsed_json" | jq -r '.to // empty' 2>/dev/null)
+		subj=$(echo "$parsed_json" | jq -r '.subject // empty' 2>/dev/null)
+		msg_id_header=$(echo "$parsed_json" | jq -r '.message_id // empty' 2>/dev/null)
+		in_reply_to=$(echo "$parsed_json" | jq -r '.in_reply_to // empty' 2>/dev/null)
+		body_text=$(echo "$parsed_json" | jq -r '.body_text // empty' 2>/dev/null)
+	else
+		# Fallback: grep headers from raw .eml
+		from_addr=$(grep -m1 -i '^From: ' "$local_file" 2>/dev/null | sed 's/^[Ff]rom: //' || echo "unknown")
+		to_addr=$(grep -m1 -i '^To: ' "$local_file" 2>/dev/null | sed 's/^[Tt]o: //' || echo "unknown")
+		subj=$(grep -m1 -i '^Subject: ' "$local_file" 2>/dev/null | sed 's/^[Ss]ubject: //' || echo "(no subject)")
+		msg_id_header=$(grep -m1 -i '^Message-ID: ' "$local_file" 2>/dev/null | sed 's/^[Mm]essage-[Ii][Dd]: //' || echo "")
+		in_reply_to=$(grep -m1 -i '^In-Reply-To: ' "$local_file" 2>/dev/null | sed 's/^[Ii]n-[Rr]eply-[Tt]o: //' || echo "")
+		body_text=$(sed -n '/^$/,$ { /^$/d; p; }' "$local_file" 2>/dev/null | head -200 || echo "")
+	fi
+
+	# Write fields to temp files to avoid pipe-delimiter issues with body text
+	local tmpdir
+	tmpdir=$(mktemp -d)
+	printf '%s' "$from_addr" >"${tmpdir}/from"
+	printf '%s' "$to_addr" >"${tmpdir}/to"
+	printf '%s' "$subj" >"${tmpdir}/subject"
+	printf '%s' "$msg_id_header" >"${tmpdir}/message_id"
+	printf '%s' "$in_reply_to" >"${tmpdir}/in_reply_to"
+	printf '%s' "$body_text" >"${tmpdir}/body_text"
+	echo "$tmpdir"
+	return 0
+}
+
+# Match an inbound email to an existing conversation or create a new one.
+# Args: mission_id in_reply_to from_addr subj to_addr
+# Prints the conv_id.
+_poll_match_conversation() {
+	local mission_id="$1" in_reply_to="$2" from_addr="$3" subj="$4" to_addr="$5"
+
+	local conv_id=""
+	if [[ -n "$in_reply_to" ]]; then
+		conv_id=$(db "$DB_FILE" "
+			SELECT conv_id FROM messages
+			WHERE (message_id = '$(sql_escape "$in_reply_to")' OR ses_message_id = '$(sql_escape "$in_reply_to")')
+			AND mission_id = '$(sql_escape "$mission_id")'
+			LIMIT 1;
+		")
+	fi
+
+	if [[ -z "$conv_id" ]]; then
+		local clean_subject
+		clean_subject=$(echo "$subj" | sed -E 's/^(Re|Fwd|FW|Fw): *//gi')
+		conv_id=$(db "$DB_FILE" "
+			SELECT id FROM conversations
+			WHERE mission_id = '$(sql_escape "$mission_id")'
+			AND (to_email = '$(sql_escape "$from_addr")' OR from_email = '$(sql_escape "$from_addr")')
+			AND subject LIKE '%$(sql_escape "$clean_subject")%'
+			LIMIT 1;
+		")
+	fi
+
+	if [[ -z "$conv_id" ]]; then
+		conv_id=$(generate_id "conv")
+		db "$DB_FILE" "
+			INSERT INTO conversations (id, mission_id, subject, to_email, from_email, status)
+			VALUES ('$(sql_escape "$conv_id")', '$(sql_escape "$mission_id")', '$(sql_escape "$subj")', '$(sql_escape "$to_addr")', '$(sql_escape "$from_addr")', 'active');
+		"
+	fi
+
+	echo "$conv_id"
+	return 0
+}
+
+# Ingest a single email from S3 into the database.
+# Args: s3_key s3_bucket download_dir mission_id objects_json since
+# Returns 0 if ingested, 1 if skipped.
+_poll_ingest_email() {
+	local s3_key="$1" s3_bucket="$2" download_dir="$3" mission_id="$4"
+	local objects_json="$5" since="$6"
+
+	# Skip if already ingested
+	local already_exists
+	already_exists=$(db "$DB_FILE" "SELECT count(*) FROM messages WHERE s3_key = '$(sql_escape "$s3_key")';")
+	[[ "$already_exists" -gt 0 ]] && return 1
+
+	# Filter by date if --since specified
+	if [[ -n "$since" ]]; then
+		local obj_date
+		obj_date=$(echo "$objects_json" | jq -r --arg s3_key "$s3_key" '.Contents[] | select(.Key == $s3_key) | .LastModified' 2>/dev/null)
+		[[ -n "$obj_date" && "$obj_date" < "$since" ]] && return 1
+	fi
+
+	# Download the email
+	local local_file="${download_dir}/$(basename "$s3_key")"
+	aws s3 cp "s3://${s3_bucket}/${s3_key}" "$local_file" --quiet 2>/dev/null || {
+		print_warning "Failed to download: $s3_key"
+		return 1
+	}
+
+	# Parse email fields into temp files (avoids pipe-delimiter issues)
+	local fields_dir
+	fields_dir=$(_poll_parse_email_fields "$local_file")
+	local from_addr to_addr subj msg_id_header in_reply_to body_text
+	from_addr=$(cat "${fields_dir}/from")
+	to_addr=$(cat "${fields_dir}/to")
+	subj=$(cat "${fields_dir}/subject")
+	msg_id_header=$(cat "${fields_dir}/message_id")
+	in_reply_to=$(cat "${fields_dir}/in_reply_to")
+	body_text=$(cat "${fields_dir}/body_text")
+	rm -rf "$fields_dir"
+
+	# Match or create conversation
+	local conv_id
+	conv_id=$(_poll_match_conversation "$mission_id" "$in_reply_to" "$from_addr" "$subj" "$to_addr")
+
+	# Store the message
+	local ea_msg_id
+	ea_msg_id=$(generate_id "msg")
+	db "$DB_FILE" "
+		INSERT INTO messages (id, conv_id, mission_id, direction, from_email, to_email, subject, body_text, message_id, in_reply_to, s3_key, raw_path)
+		VALUES ('$(sql_escape "$ea_msg_id")', '$(sql_escape "$conv_id")', '$(sql_escape "$mission_id")', 'inbound', '$(sql_escape "$from_addr")', '$(sql_escape "$to_addr")', '$(sql_escape "$subj")', '$(sql_escape "$body_text")', '$(sql_escape "$msg_id_header")', '$(sql_escape "$in_reply_to")', '$(sql_escape "$s3_key")', '$(sql_escape "$local_file")');
+	"
+
+	db "$DB_FILE" "
+		UPDATE conversations SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now'), status = 'active'
+		WHERE id = '$(sql_escape "$conv_id")';
+	"
+
+	# Auto-extract verification codes
+	extract_codes_from_text "$ea_msg_id" "$mission_id" "$body_text"
+
+	log_info "Ingested: $ea_msg_id from $from_addr (conv: $conv_id)"
 	return 0
 }
 
@@ -564,8 +674,6 @@ cmd_poll() {
 				return 1
 			}
 			# Validate and normalize to ISO 8601 (YYYY-MM-DDTHH:MM:SSZ)
-			# Accept: ISO 8601 with/without time, with Z/+offset, or date-only
-			# GNU date uses -d, BSD/macOS date uses -j -f
 			if since=$(date -d "$2" -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null); then
 				: # GNU date succeeded
 			elif since=$(date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$2" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null); then
@@ -585,10 +693,10 @@ cmd_poll() {
 		esac
 	done
 
-	if [[ -z "$mission_id" ]]; then
+	[[ -z "$mission_id" ]] && {
 		print_error "Mission ID is required (--mission M001)"
 		return 1
-	fi
+	}
 
 	check_dependencies || return 1
 	load_config || return 1
@@ -597,25 +705,18 @@ cmd_poll() {
 
 	local s3_bucket
 	s3_bucket=$(get_config_value '.s3_receive_bucket' '')
-	if [[ -z "$s3_bucket" ]]; then
+	[[ -z "$s3_bucket" ]] && {
 		print_error "S3 receive bucket not configured. Set s3_receive_bucket in config"
 		return 1
-	fi
+	}
 
 	local s3_prefix
 	s3_prefix=$(get_config_value '.s3_receive_prefix' 'incoming/')
 
-	# Create local download directory
 	local download_dir="${WORKSPACE_DIR}/inbox/${mission_id}"
 	mkdir -p "$download_dir"
 
-	# List new objects in S3
 	local list_args=(s3api list-objects-v2 --bucket "$s3_bucket" --prefix "$s3_prefix")
-	if [[ -n "$since" ]]; then
-		# S3 doesn't support date filtering natively; we filter client-side
-		true
-	fi
-
 	local objects_json
 	objects_json=$(aws "${list_args[@]}" --output json 2>/dev/null) || {
 		print_error "Failed to list S3 objects in $s3_bucket/$s3_prefix"
@@ -635,108 +736,9 @@ cmd_poll() {
 
 	while IFS= read -r s3_key; do
 		[[ -z "$s3_key" ]] && continue
-
-		# Skip if already ingested
-		local already_exists
-		already_exists=$(db "$DB_FILE" "SELECT count(*) FROM messages WHERE s3_key = '$(sql_escape "$s3_key")';")
-		if [[ "$already_exists" -gt 0 ]]; then
-			continue
+		if _poll_ingest_email "$s3_key" "$s3_bucket" "$download_dir" "$mission_id" "$objects_json" "$since"; then
+			ingested=$((ingested + 1))
 		fi
-
-		# Filter by date if --since specified
-		if [[ -n "$since" ]]; then
-			local obj_date
-			obj_date=$(echo "$objects_json" | jq -r --arg s3_key "$s3_key" '.Contents[] | select(.Key == $s3_key) | .LastModified' 2>/dev/null)
-			if [[ -n "$obj_date" && "$obj_date" < "$since" ]]; then
-				continue
-			fi
-		fi
-
-		# Download the email
-		local local_file="${download_dir}/$(basename "$s3_key")"
-		aws s3 cp "s3://${s3_bucket}/${s3_key}" "$local_file" --quiet 2>/dev/null || {
-			print_warning "Failed to download: $s3_key"
-			continue
-		}
-
-		# Parse the email
-		local parsed_json=""
-		if [[ -x "$EMAIL_TO_MD_SCRIPT" ]] && command -v python3 &>/dev/null; then
-			parsed_json=$(python3 "$EMAIL_TO_MD_SCRIPT" "$local_file" --json 2>/dev/null || echo "")
-		fi
-
-		# Extract basic fields from raw email if python parsing fails
-		local from_addr="" to_addr="" subj="" msg_id_header="" in_reply_to="" body_text=""
-		if [[ -n "$parsed_json" ]]; then
-			from_addr=$(echo "$parsed_json" | jq -r '.from // empty' 2>/dev/null)
-			to_addr=$(echo "$parsed_json" | jq -r '.to // empty' 2>/dev/null)
-			subj=$(echo "$parsed_json" | jq -r '.subject // empty' 2>/dev/null)
-			msg_id_header=$(echo "$parsed_json" | jq -r '.message_id // empty' 2>/dev/null)
-			in_reply_to=$(echo "$parsed_json" | jq -r '.in_reply_to // empty' 2>/dev/null)
-			body_text=$(echo "$parsed_json" | jq -r '.body_text // empty' 2>/dev/null)
-		else
-			# Fallback: grep headers from raw .eml
-			from_addr=$(grep -m1 -i '^From: ' "$local_file" 2>/dev/null | sed 's/^[Ff]rom: //' || echo "unknown")
-			to_addr=$(grep -m1 -i '^To: ' "$local_file" 2>/dev/null | sed 's/^[Tt]o: //' || echo "unknown")
-			subj=$(grep -m1 -i '^Subject: ' "$local_file" 2>/dev/null | sed 's/^[Ss]ubject: //' || echo "(no subject)")
-			msg_id_header=$(grep -m1 -i '^Message-ID: ' "$local_file" 2>/dev/null | sed 's/^[Mm]essage-[Ii][Dd]: //' || echo "")
-			in_reply_to=$(grep -m1 -i '^In-Reply-To: ' "$local_file" 2>/dev/null | sed 's/^[Ii]n-[Rr]eply-[Tt]o: //' || echo "")
-			# Extract body (everything after first blank line)
-			body_text=$(sed -n '/^$/,$ { /^$/d; p; }' "$local_file" 2>/dev/null | head -200 || echo "")
-		fi
-
-		# Find matching conversation by In-Reply-To or subject+email
-		local conv_id=""
-		if [[ -n "$in_reply_to" ]]; then
-			conv_id=$(db "$DB_FILE" "
-				SELECT conv_id FROM messages
-				WHERE (message_id = '$(sql_escape "$in_reply_to")' OR ses_message_id = '$(sql_escape "$in_reply_to")')
-				AND mission_id = '$(sql_escape "$mission_id")'
-				LIMIT 1;
-			")
-		fi
-
-		if [[ -z "$conv_id" ]]; then
-			# Try matching by subject (strip Re:/Fwd: prefixes) and email address
-			local clean_subject
-			clean_subject=$(echo "$subj" | sed -E 's/^(Re|Fwd|FW|Fw): *//gi')
-			conv_id=$(db "$DB_FILE" "
-				SELECT id FROM conversations
-				WHERE mission_id = '$(sql_escape "$mission_id")'
-				AND (to_email = '$(sql_escape "$from_addr")' OR from_email = '$(sql_escape "$from_addr")')
-				AND subject LIKE '%$(sql_escape "$clean_subject")%'
-				LIMIT 1;
-			")
-		fi
-
-		# Create new conversation if no match
-		if [[ -z "$conv_id" ]]; then
-			conv_id=$(generate_id "conv")
-			db "$DB_FILE" "
-				INSERT INTO conversations (id, mission_id, subject, to_email, from_email, status)
-				VALUES ('$(sql_escape "$conv_id")', '$(sql_escape "$mission_id")', '$(sql_escape "$subj")', '$(sql_escape "$to_addr")', '$(sql_escape "$from_addr")', 'active');
-			"
-		fi
-
-		# Store the message
-		local ea_msg_id
-		ea_msg_id=$(generate_id "msg")
-		db "$DB_FILE" "
-			INSERT INTO messages (id, conv_id, mission_id, direction, from_email, to_email, subject, body_text, message_id, in_reply_to, s3_key, raw_path)
-			VALUES ('$(sql_escape "$ea_msg_id")', '$(sql_escape "$conv_id")', '$(sql_escape "$mission_id")', 'inbound', '$(sql_escape "$from_addr")', '$(sql_escape "$to_addr")', '$(sql_escape "$subj")', '$(sql_escape "$body_text")', '$(sql_escape "$msg_id_header")', '$(sql_escape "$in_reply_to")', '$(sql_escape "$s3_key")', '$(sql_escape "$local_file")');
-		"
-
-		# Update conversation
-		db "$DB_FILE" "
-			UPDATE conversations SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now'), status = 'active'
-			WHERE id = '$(sql_escape "$conv_id")';
-		"
-
-		# Auto-extract verification codes
-		extract_codes_from_text "$ea_msg_id" "$mission_id" "$body_text"
-
-		ingested=$((ingested + 1))
-		log_info "Ingested: $ea_msg_id from $from_addr (conv: $conv_id)"
 	done <<<"$keys"
 
 	if [[ "$ingested" -gt 0 ]]; then
@@ -841,6 +843,38 @@ extract_codes_from_text() {
 	return 0
 }
 
+# Display extracted codes with masked values.
+# Args: where_clause (SQL WHERE clause for filtering)
+_display_extracted_codes() {
+	local where_clause="$1"
+
+	local codes
+	codes=$(db -separator '|' "$DB_FILE" "
+		SELECT code_type, code_value, confidence, used, created_at
+		FROM extracted_codes $where_clause
+		ORDER BY created_at DESC;
+	")
+
+	[[ -z "$codes" ]] && return 0
+
+	echo ""
+	echo "Extracted Codes:"
+	echo "================"
+	while IFS='|' read -r ctype cval conf used created; do
+		local status_label="available"
+		[[ "$used" -eq 1 ]] && status_label="used"
+		# Mask sensitive values
+		local display_val
+		if [[ ${#cval} -gt 8 ]]; then
+			display_val="${cval:0:4}...${cval: -4}"
+		else
+			display_val="${cval:0:2}****"
+		fi
+		echo "  [$ctype] $display_val (confidence: $conf, $status_label, $created)"
+	done <<<"$codes"
+	return 0
+}
+
 cmd_extract_codes() {
 	local message_id="" mission_id=""
 
@@ -872,18 +906,16 @@ cmd_extract_codes() {
 	ensure_db
 
 	if [[ -n "$message_id" ]]; then
-		# Extract from specific message
 		local body_text
 		body_text=$(db "$DB_FILE" "SELECT body_text FROM messages WHERE id = '$(sql_escape "$message_id")';")
-		if [[ -z "$body_text" ]]; then
+		[[ -z "$body_text" ]] && {
 			print_error "Message not found: $message_id"
 			return 1
-		fi
+		}
 		local msg_mission
 		msg_mission=$(db "$DB_FILE" "SELECT mission_id FROM messages WHERE id = '$(sql_escape "$message_id")';")
 		extract_codes_from_text "$message_id" "$msg_mission" "$body_text"
 	elif [[ -n "$mission_id" ]]; then
-		# Extract from all unprocessed messages in mission
 		# Fetch IDs only — body_text may contain pipes and newlines that break
 		# pipe-separated parsing, so we fetch each body in a separate query.
 		local message_ids
@@ -917,34 +949,88 @@ cmd_extract_codes() {
 	elif [[ -n "$message_id" ]]; then
 		where_clause="WHERE message_id = '$(sql_escape "$message_id")'"
 	fi
+	_display_extracted_codes "$where_clause"
 
-	local codes
-	codes=$(db -separator '|' "$DB_FILE" "
-		SELECT code_type, code_value, confidence, used, created_at
-		FROM extracted_codes $where_clause
-		ORDER BY created_at DESC;
+	return 0
+}
+
+# ============================================================================
+# Thread / conversation commands — sub-functions
+# ============================================================================
+
+# Display a single conversation thread: header, messages, and extracted codes.
+# Args: conv_id
+_thread_show_conversation() {
+	local conv_id="$1"
+
+	local conv_info
+	conv_info=$(db -separator '|' "$DB_FILE" "
+		SELECT id, mission_id, subject, to_email, from_email, status, created_at
+		FROM conversations WHERE id = '$(sql_escape "$conv_id")';
+	")
+	if [[ -z "$conv_info" ]]; then
+		print_error "Conversation not found: $conv_id"
+		return 1
+	fi
+
+	local cid cmission csubject cto cfrom cstatus ccreated
+	IFS='|' read -r cid cmission csubject cto cfrom cstatus ccreated <<<"$conv_info"
+
+	echo "Conversation: $cid"
+	echo "  Mission:  $cmission"
+	echo "  Subject:  $csubject"
+	echo "  Between:  $cfrom <-> $cto"
+	echo "  Status:   $cstatus"
+	echo "  Started:  $ccreated"
+	echo ""
+	echo "Messages:"
+	echo "---------"
+
+	local messages
+	messages=$(db -separator '|' "$DB_FILE" "
+		SELECT id, direction, from_email, subject, created_at,
+			   substr(body_text, 1, 200) as preview
+		FROM messages
+		WHERE conv_id = '$(sql_escape "$conv_id")'
+		ORDER BY created_at ASC;
 	")
 
+	if [[ -n "$messages" ]]; then
+		while IFS='|' read -r mid mdir mfrom msubj mcreated mpreview; do
+			local arrow="<-"
+			[[ "$mdir" == "outbound" ]] && arrow="->"
+			echo "  [$mcreated] $arrow $mfrom"
+			echo "    Subject: $msubj"
+			[[ -n "$mpreview" ]] && echo "    Preview: ${mpreview:0:120}..."
+			echo ""
+		done <<<"$messages"
+	else
+		echo "  (no messages)"
+	fi
+
+	# Show extracted codes for this conversation
+	local codes
+	codes=$(db -separator '|' "$DB_FILE" "
+		SELECT ec.code_type, ec.code_value, ec.confidence, ec.used
+		FROM extracted_codes ec
+		JOIN messages m ON ec.message_id = m.id
+		WHERE m.conv_id = '$(sql_escape "$conv_id")'
+		ORDER BY ec.created_at DESC;
+	")
 	if [[ -n "$codes" ]]; then
-		echo ""
 		echo "Extracted Codes:"
-		echo "================"
-		while IFS='|' read -r ctype cval conf used created; do
-			local status_label="available"
-			if [[ "$used" -eq 1 ]]; then
-				status_label="used"
-			fi
-			# Mask sensitive values
+		while IFS='|' read -r ctype cval conf used; do
 			local display_val
 			if [[ ${#cval} -gt 8 ]]; then
 				display_val="${cval:0:4}...${cval: -4}"
 			else
 				display_val="${cval:0:2}****"
 			fi
-			echo "  [$ctype] $display_val (confidence: $conf, $status_label, $created)"
+			local status_label="available"
+			[[ "$used" -eq 1 ]] && status_label="used"
+			echo "  [$ctype] $display_val ($status_label)"
 		done <<<"$codes"
 	fi
-
 	return 0
 }
 
@@ -980,91 +1066,16 @@ cmd_thread() {
 		esac
 	done
 
-	if [[ -z "$mission_id" && -z "$conv_id" ]]; then
+	[[ -z "$mission_id" && -z "$conv_id" ]] && {
 		print_error "Specify --mission <id> or --conversation <id>"
 		return 1
-	fi
+	}
 
 	ensure_db
 
 	if [[ -n "$conv_id" ]]; then
-		# Show specific conversation thread
-		local conv_info
-		conv_info=$(db -separator '|' "$DB_FILE" "
-			SELECT id, mission_id, subject, to_email, from_email, status, created_at
-			FROM conversations WHERE id = '$(sql_escape "$conv_id")';
-		")
-		if [[ -z "$conv_info" ]]; then
-			print_error "Conversation not found: $conv_id"
-			return 1
-		fi
-
-		local cid cmission csubject cto cfrom cstatus ccreated
-		IFS='|' read -r cid cmission csubject cto cfrom cstatus ccreated <<<"$conv_info"
-
-		echo "Conversation: $cid"
-		echo "  Mission:  $cmission"
-		echo "  Subject:  $csubject"
-		echo "  Between:  $cfrom <-> $cto"
-		echo "  Status:   $cstatus"
-		echo "  Started:  $ccreated"
-		echo ""
-		echo "Messages:"
-		echo "---------"
-
-		local messages
-		messages=$(db -separator '|' "$DB_FILE" "
-			SELECT id, direction, from_email, subject, created_at,
-				   substr(body_text, 1, 200) as preview
-			FROM messages
-			WHERE conv_id = '$(sql_escape "$conv_id")'
-			ORDER BY created_at ASC;
-		")
-
-		if [[ -n "$messages" ]]; then
-			while IFS='|' read -r mid mdir mfrom msubj mcreated mpreview; do
-				local arrow="<-"
-				if [[ "$mdir" == "outbound" ]]; then
-					arrow="->"
-				fi
-				echo "  [$mcreated] $arrow $mfrom"
-				echo "    Subject: $msubj"
-				if [[ -n "$mpreview" ]]; then
-					echo "    Preview: ${mpreview:0:120}..."
-				fi
-				echo ""
-			done <<<"$messages"
-		else
-			echo "  (no messages)"
-		fi
-
-		# Show extracted codes for this conversation
-		local codes
-		codes=$(db -separator '|' "$DB_FILE" "
-			SELECT ec.code_type, ec.code_value, ec.confidence, ec.used
-			FROM extracted_codes ec
-			JOIN messages m ON ec.message_id = m.id
-			WHERE m.conv_id = '$(sql_escape "$conv_id")'
-			ORDER BY ec.created_at DESC;
-		")
-		if [[ -n "$codes" ]]; then
-			echo "Extracted Codes:"
-			while IFS='|' read -r ctype cval conf used; do
-				local display_val
-				if [[ ${#cval} -gt 8 ]]; then
-					display_val="${cval:0:4}...${cval: -4}"
-				else
-					display_val="${cval:0:2}****"
-				fi
-				local status_label="available"
-				if [[ "$used" -eq 1 ]]; then
-					status_label="used"
-				fi
-				echo "  [$ctype] $display_val ($status_label)"
-			done <<<"$codes"
-		fi
+		_thread_show_conversation "$conv_id"
 	else
-		# Show all conversations for mission
 		cmd_conversations "--mission" "$mission_id"
 	fi
 
