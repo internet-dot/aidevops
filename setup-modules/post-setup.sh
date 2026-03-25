@@ -40,7 +40,7 @@ setup_auto_update() {
 			echo "Safe to run while AI sessions are active."
 			echo ""
 			read -r -p "Enable auto-update? [Y/n]: " enable_auto
-			if [[ "$enable_auto" =~ ^[Yy]?$ || -z "$enable_auto" ]]; then
+			if [[ "$enable_auto" =~ ^[Yy]?$ ]]; then
 				bash "$auto_update_script" enable
 			else
 				print_info "Skipped. Enable later: aidevops auto-update enable"
@@ -150,7 +150,7 @@ setup_onboarding_prompt() {
 		echo "  - Set up API keys and credentials interactively"
 		echo ""
 		read -r -p "Launch OpenCode with /onboarding now? [Y/n]: " launch_onboarding
-		if [[ "$launch_onboarding" =~ ^[Yy]?$ || "$launch_onboarding" == "Y" ]]; then
+		if [[ "$launch_onboarding" =~ ^[Yy]?$ ]]; then
 			echo ""
 			echo "Starting OpenCode with onboarding wizard..."
 			# Launch with /onboarding prompt only — don't use --agent flag because
