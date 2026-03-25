@@ -682,8 +682,13 @@ setup_contribution_watch() {
 	else
 		_cw_log_dir="~/.aidevops/logs"
 	fi
-	if [[ "$_cw_log_dir" == *['`$"']* ]] || [[ "$_cw_log_dir" == *$'\n'* ]]; then
-		print_error "Invalid characters in paths.log_dir: $_cw_log_dir"
+	# Whitelist: only allow characters safe in shell paths and cron lines.
+	# Reject anything outside [A-Za-z0-9_./ ~-] (tilde allowed before expansion).
+	# Store regex in variable — bash [[ =~ ]] requires unquoted RHS for regex,
+	# and a variable avoids quoting issues with special chars in the pattern.
+	local _cw_log_dir_re='^[A-Za-z0-9_./ ~-]+$'
+	if ! [[ "$_cw_log_dir" =~ $_cw_log_dir_re ]]; then
+		print_error "Invalid characters in paths.log_dir (only [A-Za-z0-9_./ ~-] allowed): $_cw_log_dir"
 		return 1
 	fi
 	_cw_log_dir="${_cw_log_dir/#\~/$HOME}"

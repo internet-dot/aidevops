@@ -870,7 +870,7 @@ main() {
 	# Post-setup: auto-update, schedulers, final instructions (GH#5793)
 	setup_auto_update
 	setup_supervisor_pulse "$_os"
-	setup_stats_wrapper "${PULSE_CONSENT_LOWER:-}"
+	setup_stats_wrapper "${PULSE_ENABLED:-}"
 	setup_repo_sync
 	setup_process_guard
 	setup_memory_pressure_monitor
