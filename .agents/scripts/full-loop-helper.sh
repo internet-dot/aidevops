@@ -14,7 +14,25 @@ readonly STATE_FILE="${STATE_DIR}/full-loop.local.state"
 readonly DEFAULT_MAX_TASK_ITERATIONS=50 DEFAULT_MAX_PREFLIGHT_ITERATIONS=5 DEFAULT_MAX_PR_ITERATIONS=20
 readonly BOLD='\033[1m'
 
+# Initialise all optional state variables with safe defaults so set -u never
+# fires on them, regardless of which flags were passed or whether load_state
+# was called.
 HEADLESS="${FULL_LOOP_HEADLESS:-false}"
+MAX_TASK_ITERATIONS="${MAX_TASK_ITERATIONS:-$DEFAULT_MAX_TASK_ITERATIONS}"
+MAX_PREFLIGHT_ITERATIONS="${MAX_PREFLIGHT_ITERATIONS:-$DEFAULT_MAX_PREFLIGHT_ITERATIONS}"
+MAX_PR_ITERATIONS="${MAX_PR_ITERATIONS:-$DEFAULT_MAX_PR_ITERATIONS}"
+SKIP_PREFLIGHT="${SKIP_PREFLIGHT:-false}"
+SKIP_POSTFLIGHT="${SKIP_POSTFLIGHT:-false}"
+SKIP_RUNTIME_TESTING="${SKIP_RUNTIME_TESTING:-false}"
+NO_AUTO_PR="${NO_AUTO_PR:-false}"
+NO_AUTO_DEPLOY="${NO_AUTO_DEPLOY:-false}"
+DRY_RUN="${DRY_RUN:-false}"
+# State variables populated by load_state; pre-initialised so cmd_status /
+# cmd_resume never hit unbound-variable errors even if load_state is skipped.
+CURRENT_PHASE=""
+STARTED_AT=""
+PR_NUMBER=""
+SAVED_PROMPT=""
 
 is_headless() { [[ "$HEADLESS" == "true" ]]; }
 
@@ -56,7 +74,7 @@ load_state() {
 		_val="${_line#*=}"
 		# Allowlist: only set known state variables
 		case "$_key" in
-		PHASE | ACTIVE | ITERATION | MAX_TASK_ITERATIONS | MAX_PREFLIGHT_ITERATIONS | \
+		PHASE | ACTIVE | ITERATION | STARTED_AT | MAX_TASK_ITERATIONS | MAX_PREFLIGHT_ITERATIONS | \
 			MAX_PR_ITERATIONS | SKIP_PREFLIGHT | SKIP_POSTFLIGHT | SKIP_RUNTIME_TESTING | \
 			NO_AUTO_PR | NO_AUTO_DEPLOY | HEADLESS | PR_NUMBER)
 			printf -v "$_key" '%s' "$_val"
@@ -329,10 +347,14 @@ EOF
 
 _run_foreground() {
 	local prompt="$1"
-	local pid_file="${STATE_DIR}/full-loop.pid"
+	# Use a non-local variable for the PID file path so the EXIT trap can
+	# reference it after the function's local scope is torn down.  Under
+	# set -u a local variable referenced inside a trap that fires post-return
+	# is unbound and crashes the script.
+	_RUN_FG_PID_FILE="${STATE_DIR}/full-loop.pid"
 	# On exit (normal or error), clear the PID file so status/logs don't report
 	# a background loop that is no longer running.
-	trap 'rm -f "$pid_file"' EXIT
+	trap 'rm -f "$_RUN_FG_PID_FILE"' EXIT
 	emit_task_phase "$prompt"
 	return 0
 }
