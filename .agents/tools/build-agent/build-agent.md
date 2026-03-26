@@ -110,7 +110,7 @@ Use primary sources over tutorials. Cross-reference, prefer recent, watch for ve
 6. **Duplicates?** `rg "pattern" .agents/` before adding
 7. **Existing agent?** Call and improve vs duplicate?
 8. **Sources verified?** Primary, cross-referenced
-9. **Markdown linting?** MD025/MD022/MD031/MD012. Run `npx markdownlint-cli2 "path/to/file.md"`
+9. **Markdown linting?** MD025/MD022/MD031/MD012. Run `bunx markdownlint-cli2 "path/to/file.md"`
 
 ## Code Examples: When to Include
 
