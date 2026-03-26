@@ -35,7 +35,7 @@
 - **90-94%**: Directional only — keep running if budget allows
 - **<90%**: Insufficient — do not declare winner
 
-Calculators: VWO, Optimizely Stats Engine, AB Test Guide, Google Analytics Experiments.
+Calculators: VWO, Optimizely Stats Engine, AB Test Guide.
 
 ---
 
@@ -76,7 +76,7 @@ Calculators: VWO, Optimizely Stats Engine, AB Test Guide, Google Analytics Exper
 | EXPAND AUDIENCE | Great efficiency, low volume | Broaden targeting |
 | KILL | CPA well above target, low engagement, declining | Pause immediately |
 
-**Scaling:** Gradual: $50-100/day → 2x day 8 → 2x day 15 → 20-40% thereafter. Rapid (CPA 30%+ below target): 5x day 8, monitor closely.
+**Scaling:** Gradual: $50-100/day → increase 15-20% every 3-4 days while KPI stability holds. Rapid (CPA 30%+ below target): cap individual increases at 20% to avoid re-entering learning phase; use spend caps, rollback triggers, and daily CPA/ROAS checks.
 
 **Iterate on winners:** Different creator/same script, same creator/different hook, shorter cut, different product focus. Build a "creative cluster" around winning concepts.
 
@@ -293,7 +293,7 @@ View definitions: Facebook/Instagram = 3s, 10s, ThruPlay (end or 15s). YouTube =
 
 Higher rankings = lower costs + better delivery. Improve via better creative, targeting, offer, and reducing negative feedback.
 
-**Attribution:** Facebook default = 7-day click or 1-day view (also 1-day, 28-day options). Google default = data-driven (also last click, first click, linear, time decay, position-based). Different windows = different CPA reporting.
+**Attribution:** Meta default = 7-day click + 1-day view. Google default = data-driven. Available models and windows vary by platform, objective, and account configuration — verify current settings in Meta Ads Manager and Google Ads before interpreting CPA/ROAS. Different windows/models will materially change reported performance.
 
 **Monitoring:** Daily: spend, CPA/ROAS, volume, CTR drops. Weekly: winners/losers, fatigue, audience, quality rankings. Monthly: account health, creative library, patterns, competitive benchmarks.
 
@@ -307,6 +307,6 @@ Higher rankings = lower costs + better delivery. Improve via better creative, ta
 |----------|-------|
 | Native | Facebook Ads Manager, Google Ads, TikTok Ads Manager |
 | Attribution | Google Analytics, Triple Whale, Hyros, Northbeam |
-| Reporting | Google Data Studio, Supermetrics, Funnel.io |
+| Reporting | Looker Studio, Supermetrics, Funnel.io |
 | Creative intelligence | Foreplay.co, Madgicx, Motion.io, Smartly.io |
-| A/B calculators | VWO, Optimizely Stats Engine, AB Test Guide, Google Analytics Experiments |
+| A/B calculators | VWO, Optimizely Stats Engine, AB Test Guide |
