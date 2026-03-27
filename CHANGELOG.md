@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.315] - 2026-03-27
+
+### Fixed
+
+- remove 500-line size gate from md simplification scan (t1679) (#6879)
+
 ## [3.1.310] - 2026-03-27
 
 ### Changed
