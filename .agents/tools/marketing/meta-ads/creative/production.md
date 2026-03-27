@@ -29,7 +29,7 @@ Expect to test 5-10 concepts to find 1-2 winners.
 
 ## Production Pipeline
 
-```
+```text
 1. IDEATION  → Review winners, competitor research, customer feedback, brainstorm angles
 2. BRIEF     → Define concept, script/outline, technical specs, assign creator
 3. PRODUCTION→ Shoot/create, edit, add captions, export all formats
