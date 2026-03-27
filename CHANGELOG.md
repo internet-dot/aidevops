@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.310] - 2026-03-27
+
+### Changed
+
+- Refactor: terse pass on build.txt and AGENTS.md — compress prose without losing rules (#6868)
+
 ## [3.1.289] - 2026-03-27
 
 ### Added
