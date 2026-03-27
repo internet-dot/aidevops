@@ -466,12 +466,14 @@ Git is the primary audit trail for all work. Every change should be discoverable
 #
 # Critical difference: IFS=$'\t' on while-read loops
 # In bash: `IFS=$'\t'` on the `while` line is scoped to the `read` command only.
-# In zsh: `IFS=$'\t'` LEAKS into the loop body's subshells, corrupting PATH-based
-# command resolution. ALL $() command substitutions inside the loop fail with
-# "command not found" — even for standard utilities (sed, grep, cut, basename).
+# In zsh: `IFS=$'\t'` LEAKS into the loop body's subshells, causing $() command
+# substitutions and external commands to fail with "command not found" — even for
+# standard utilities (sed, grep, cut, basename). The exact mechanism may vary by
+# zsh version, but the observed behaviour is consistent: commands that work
+# outside the loop fail inside it when IFS is set to tab on the while-read line.
 #
 # BROKEN in zsh (agent-generated inline commands):
-#   echo -e "100\ttest.md" | while IFS=$'\t' read -r size path; do
+#   printf '100\ttest.md\n' | while IFS=$'\t' read -r size path; do
 #     base=$(echo "$path" | sed 's|\.md$||')   # FAILS: sed not found
 #     if echo "$x" | grep -qi "$base"; then     # FAILS: grep not found
 #       continue
@@ -487,8 +489,8 @@ Git is the primary audit trail for all work. Every change should be discoverable
   - `${path##*/}` instead of `$(basename "$path")`
   - `${path%.md}` instead of `$(echo "$path" | sed 's|\.md$||')`
   - `${line%%$'\t'*}` and `${line#*$'\t'}` instead of `$(echo "$line" | cut -f1)` / `cut -f2`
-- If subshell commands are unavoidable inside the loop, save and restore IFS:
-  - `while IFS=$'\t' read -r a b; do old_ifs="$IFS"; IFS=' '; result=$(cmd); IFS=$'\t'; done`
+- If subshell commands are unavoidable inside the loop, save and restore IFS correctly:
+  - `while IFS=$'\t' read -r a b; do old_ifs="$IFS"; IFS=' '; result=$(cmd); IFS="$old_ifs"; done`
 - Or avoid `IFS=$'\t'` entirely — parse tabs without setting IFS:
   - `while read -r line; do field1="${line%%$'\t'*}"; field2="${line#*$'\t'}"; done`
 - Framework .sh scripts with bash shebangs are NOT affected when invoked via `/bin/bash script.sh`
