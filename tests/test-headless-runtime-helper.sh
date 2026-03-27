@@ -473,6 +473,65 @@ else
 	pass "sourcing sandbox-exec-helper.sh with watchdog args does not print help text (GH#6617)"
 fi
 
+# ============================================================
+# Spending Limit Detection (GH#8229)
+# ============================================================
+section "Spending Limit Detection (GH#8229)"
+
+# Test classify_failure_reason detects MonthlyLimitError
+SPENDING_TMP=$(mktemp)
+printf '{"error":{"type":"MonthlyLimitError","message":"Your workspace has reached its monthly spending limit of $300"}}' >"$SPENDING_TMP"
+# Source the helper to get classify_failure_reason (need to avoid main execution)
+# Instead, call the helper's classify function indirectly via a subshell
+spending_reason=$(
+	bash -c '
+		source "'"$REPO_DIR"'/.agents/scripts/shared-constants.sh" 2>/dev/null || true
+		init_log_file 2>/dev/null || true
+		# Extract and source just the classify function
+		eval "$(sed -n "/^classify_failure_reason/,/^}/p" "'"$HELPER"'")"
+		classify_failure_reason "'"$SPENDING_TMP"'"
+	' 2>/dev/null
+) || spending_reason=""
+if [[ "$spending_reason" == "spending_limit" ]]; then
+	pass "classify_failure_reason detects MonthlyLimitError as spending_limit"
+else
+	fail "classify_failure_reason detects MonthlyLimitError as spending_limit" "Got: $spending_reason"
+fi
+
+# Test classify_failure_reason detects generic spending limit
+printf 'Error: Your account has reached its spending limit. Please upgrade your plan.' >"$SPENDING_TMP"
+spending_reason2=$(
+	bash -c '
+		source "'"$REPO_DIR"'/.agents/scripts/shared-constants.sh" 2>/dev/null || true
+		init_log_file 2>/dev/null || true
+		eval "$(sed -n "/^classify_failure_reason/,/^}/p" "'"$HELPER"'")"
+		classify_failure_reason "'"$SPENDING_TMP"'"
+	' 2>/dev/null
+) || spending_reason2=""
+if [[ "$spending_reason2" == "spending_limit" ]]; then
+	pass "classify_failure_reason detects generic 'spending limit' text"
+else
+	fail "classify_failure_reason detects generic 'spending limit' text" "Got: $spending_reason2"
+fi
+
+# Test that a regular 401 auth error is NOT classified as spending_limit
+printf '{"error":{"type":"authentication_error","message":"Invalid API key"}}' >"$SPENDING_TMP"
+auth_reason=$(
+	bash -c '
+		source "'"$REPO_DIR"'/.agents/scripts/shared-constants.sh" 2>/dev/null || true
+		init_log_file 2>/dev/null || true
+		eval "$(sed -n "/^classify_failure_reason/,/^}/p" "'"$HELPER"'")"
+		classify_failure_reason "'"$SPENDING_TMP"'"
+	' 2>/dev/null
+) || auth_reason=""
+if [[ "$auth_reason" == "auth_error" ]]; then
+	pass "classify_failure_reason correctly classifies auth_error (not spending_limit)"
+else
+	fail "classify_failure_reason correctly classifies auth_error (not spending_limit)" "Got: $auth_reason"
+fi
+
+rm -f "$SPENDING_TMP"
+
 echo ""
 printf "Total: %d, Passed: %d, Failed: %d\n" "$TOTAL_COUNT" "$PASS_COUNT" "$FAIL_COUNT"
 
