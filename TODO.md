@@ -113,7 +113,7 @@ Tasks with no open blockers - ready to work on. Use `/ready` to refresh this lis
 Session baseline grew from ~9.5k tokens (Mar 1) to ~21.8k tokens (Mar 27) in prompt files alone. Total session cost ~39k tokens before first user message. Target: reduce back toward ~25k total baseline.
 
 - [ ] t1678 refactor: remove 11 .opencode/tool/ shell wrappers — disable repo-local OpenCode tool definitions that are pure wrappers around existing helper scripts (system-cleanup, linter-manager, version-manager, quality-check, api-keys, mcp-integrations, markdown-formatter, github-release, parallel-quality, session-rename, toon). Agent calls scripts directly via bash. Saves ~3-4k tokens per session. Keep only ai-research.ts (has real logic). Create helper scripts for github-release, parallel-quality, session-rename to replace the 3 tools with custom logic. Delete .disabled files after verification. #refactor #efficiency #auto-dispatch ~2h model:sonnet logged:2026-03-27
-  - [ ] t1678.1 Create github-release-helper.sh — wrap `gh release` commands (create, draft, list, latest) with validation ~30m model:sonnet
+  - [x] t1678.1 Create github-release-helper.sh — wrap `gh release` commands (create, draft, list, latest) with validation ~30m model:sonnet pr:#6821 verified:2026-03-27
   - [ ] t1678.2 Create parallel-quality-helper.sh — run shellcheck, sonarcloud, secrets, markdown, returns checks in parallel with `&` + `wait` ~1h model:sonnet
   - [ ] t1678.3 Create session-rename-helper.sh — `curl` to OpenCode API for session rename, port auto-detection ~30m model:sonnet
   - [ ] t1678.4 Delete .disabled files and verify in fresh session ~15m model:sonnet
