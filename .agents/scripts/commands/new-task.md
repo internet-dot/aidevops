@@ -73,10 +73,43 @@ ID: {task_id}
 Ref: ref:{task_ref}
 
 Options:
-1. Add to TODO.md with brief (recommended)
-2. Customize estimate, tags, and dependencies
-3. Just show the ID (don't add to TODO.md)
+1. Add to TODO.md with brief (recommended — queued for pulse dispatch)
+2. Add to TODO.md with brief AND claim for this session (prevents pulse pickup)
+3. Customize estimate, tags, and dependencies
+4. Just show the ID (don't add to TODO.md)
 ```
+
+**Option 2 — Claim on create (t1687):** When the user intends to work on the task
+interactively in the current session (or shortly after), claiming the issue at
+creation time prevents the pulse from dispatching a worker for the same issue
+during the gap between `/new-task` and `/full-loop`. This assigns the current
+user and applies `status:in-progress` on the GitHub issue immediately.
+
+Resolve `REPO_SLUG` the same way as Step 6.5 (via `gh repo view`). The claim
+runs after the issue is created (Step 2), so `task_ref` is always available.
+If `gh issue edit` fails (silenced by `|| true`), the assignee and label are
+not applied and the issue remains dispatchable — `/full-loop` Step 0.6 will
+re-apply the same claim as a fallback when the worker starts:
+
+```bash
+REPO_SLUG="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)"
+if [[ -n "$task_ref" && -n "$REPO_SLUG" ]]; then
+  ISSUE_NUM="${task_ref#GH#}"
+  WORKER_USER=$(gh api user --jq '.login' 2>/dev/null || whoami)
+  gh issue edit "$ISSUE_NUM" --repo "$REPO_SLUG" \
+    --add-assignee "$WORKER_USER" \
+    --add-label "status:in-progress" 2>/dev/null || true
+fi
+```
+
+When successful, the pulse skips the issue via two independent checks: assignee
+presence (dedup check #2) and `status:in-progress` label (stale recovery only
+after 3+ hours). When `/full-loop` runs later, Step 0.6 is idempotent — it
+re-applies the same assignee and label with no side effects.
+
+**When NOT to claim:** If the user is queuing work for later or for pulse
+workers to pick up, use option 1 (no claim). This is the default and preserves
+the existing behaviour.
 
 ### Step 5: Create Task Brief (MANDATORY)
 
@@ -260,9 +293,10 @@ AI: Allocated: t325 (ref:GH#1260)
     - How: Add ExportButton to DataTable toolbar, use papaparse for CSV generation
     - Acceptance: Button visible in toolbar, exports current filter, handles 10k+ rows
 
-    1. Confirm and add to TODO.md
-    2. Edit brief first
-    3. Cancel
+    1. Add to TODO.md (queued for pulse dispatch)
+    2. Add to TODO.md and claim for this session
+    3. Edit brief first
+    4. Cancel
 User: 1
 AI: Added:
     - todo/tasks/t325-brief.md (brief)
@@ -287,7 +321,13 @@ AI: Brief: todo/tasks/t326-brief.md
       for iOS Safari cookie persistence. File: packages/auth/src/config.ts
     - Acceptance: iOS Safari session persists 24h, no regression on other browsers
 
-    1. Confirm  2. Edit  3. Cancel
+    1. Add to TODO.md (queued)  2. Claim for this session  3. Edit  4. Cancel
+User: 2
+AI: Added and claimed:
+    - todo/tasks/t326-brief.md (brief)
+    - TODO.md: - [ ] t326 Fix login timeout on mobile #bugfix ~2h ref:GH#1261 logged:2026-02-12
+    - Issue #1261: assigned to you + status:in-progress
+    Pulse workers will skip this issue until you release it or 3h stale recovery kicks in.
 ```
 
 ## CRITICAL: Supervisor Subtask Creation
