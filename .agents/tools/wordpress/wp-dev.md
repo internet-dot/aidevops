@@ -108,27 +108,13 @@ Multisite: add `WP_ALLOW_MULTISITE`, `MULTISITE`, `SUBDOMAIN_INSTALL`, `DOMAIN_C
 
 ## Theme Development
 
-### Block Theme Structure (FSE)
+**Block Theme (FSE)**: `style.css` (metadata), `theme.json` (settings), `functions.php`, `templates/` (index/single/page/archive), `parts/` (header/footer), `patterns/`.
 
-```text
-theme-name/
-├── style.css       # Theme metadata
-├── theme.json      # Global settings
-├── functions.php   # Theme functions
-├── templates/      # Block templates (index, single, page, archive)
-├── parts/          # Template parts (header, footer)
-└── patterns/       # Block patterns
-```
-
-### Template Hierarchy
-
-`front-page` → `home` → `index` | `single-{type}-{slug}` → `single-{type}` → `single` → `singular` → `index` | `page-{slug}` → `page-{id}` → `page` → `singular` | `archive-{type}` → `archive` | `category-{slug}` → `category-{id}` → `category` → `archive` | `search` | `404` → `index`
+**Template Hierarchy**: `front-page` → `home` → `index` | `single-{type}-{slug}` → `single-{type}` → `single` → `singular` | `page-{slug}` → `page-{id}` → `page` → `singular` | `archive-{type}` → `archive` | `category-{slug}` → `category-{id}` → `category` → `archive` | `search` | `404` → `index`
 
 ## Plugin Development
 
-### Plugin Header
-
-Required fields: `Plugin Name`, `Description`, `Version`, `Author`, `License: GPL-2.0+`, `Text Domain`, `Requires at least: 6.0`, `Requires PHP: 7.4`.
+**Plugin Header** required fields: `Plugin Name`, `Description`, `Version`, `Author`, `License: GPL-2.0+`, `Text Domain`, `Requires at least: 6.0`, `Requires PHP: 7.4`.
 
 ### Hooks & Filters
 
@@ -190,33 +176,19 @@ rsync -av --delete --exclude='.git' --exclude='node_modules' --exclude='vendor' 
 
 ### Debug Constants
 
-```php
-define('WP_DEBUG', true);
-define('WP_DEBUG_LOG', true);      // → wp-content/debug.log
-define('WP_DEBUG_DISPLAY', false);
-define('SCRIPT_DEBUG', true);
-define('SAVEQUERIES', true);
-```
+In `wp-config.php`: `WP_DEBUG=true`, `WP_DEBUG_LOG=true` (→ `wp-content/debug.log`), `WP_DEBUG_DISPLAY=false`, `SCRIPT_DEBUG=true`, `SAVEQUERIES=true`.
 
 Logs: `~/Local Sites/site-name/app/public/wp-content/debug.log` (LocalWP) | `wp-env run cli tail -f /var/www/html/wp-content/debug.log` (wp-env)
 
 ### Query Monitor
 
-```bash
-wp plugin install query-monitor --activate
-```
-
-Shows DB queries, PHP errors, HTTP requests, hooks, template hierarchy, memory.
+`wp plugin install query-monitor --activate` — shows DB queries, PHP errors, HTTP requests, hooks, template hierarchy, memory.
 
 ### OpenCode PHP LSP (Intelephense)
 
 If WordPress symbols are unresolved (`add_action`, `WP_Query`), configure `~/.config/opencode/config.json` with `lsp.intelephense` using local binary path, `extensions: ["php"]`, and `intelephense.stubs` including `"wordpress"`. If diagnostics persist, clear/rebuild cache. Do not suggest Claude-specific commands (e.g., `/lsp-restart`) in OpenCode sessions.
 
-### Error Diagnosis Workflow
-
-1. Enable `WP_DEBUG` constants → check `debug.log` → use Query Monitor
-2. Inspect database via `@localwp` → check hooks with `wp hook list`
-3. Profile with `wp profile` or Code Profiler Pro
+**Error Diagnosis**: Enable `WP_DEBUG` → check `debug.log` → Query Monitor → `@localwp` for DB → `wp hook list` → `wp profile` or Code Profiler Pro.
 
 ## WP-CLI Commands
 
