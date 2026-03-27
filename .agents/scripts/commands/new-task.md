@@ -83,9 +83,16 @@ Options:
 interactively in the current session (or shortly after), claiming the issue at
 creation time prevents the pulse from dispatching a worker for the same issue
 during the gap between `/new-task` and `/full-loop`. This assigns the current
-user and applies `status:in-progress` on the GitHub issue immediately:
+user and applies `status:in-progress` on the GitHub issue immediately.
+
+Resolve `REPO_SLUG` the same way as Step 6.5 (via `gh repo view`). The claim
+runs after the issue is created (Step 2), so `task_ref` is always available.
+If `gh issue edit` fails (silenced by `|| true`), the assignee and label are
+not applied and the issue remains dispatchable — `/full-loop` Step 0.6 will
+re-apply the same claim as a fallback when the worker starts:
 
 ```bash
+REPO_SLUG="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)"
 if [[ -n "$task_ref" && -n "$REPO_SLUG" ]]; then
   ISSUE_NUM="${task_ref#GH#}"
   WORKER_USER=$(gh api user --jq '.login' 2>/dev/null || whoami)
@@ -95,10 +102,10 @@ if [[ -n "$task_ref" && -n "$REPO_SLUG" ]]; then
 fi
 ```
 
-The pulse skips issues with an assignee (dedup check #2) and issues with
-`status:in-progress` (stale recovery only after 3+ hours), so this closes the
-race window completely. When `/full-loop` runs later, Step 0.6 is idempotent —
-it re-applies the same assignee and label with no side effects.
+When successful, the pulse skips the issue via two independent checks: assignee
+presence (dedup check #2) and `status:in-progress` label (stale recovery only
+after 3+ hours). When `/full-loop` runs later, Step 0.6 is idempotent — it
+re-applies the same assignee and label with no side effects.
 
 **When NOT to claim:** If the user is queuing work for later or for pulse
 workers to pick up, use option 1 (no claim). This is the default and preserves
