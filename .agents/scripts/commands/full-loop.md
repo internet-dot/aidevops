@@ -92,6 +92,8 @@ fi
 
 **Label lifecycle:** `available` → `queued` → `in-progress` → `in-review` → `done`. Always remove prior labels. Stale recovery: 3+ hours with no PR → pulse relabels `status:available`.
 
+**Idempotent with claim-on-create (t1687):** If `/new-task` already assigned the user and set `status:in-progress` (option 2 — "claim for this session"), this step is a no-op. The `gh issue edit` calls are idempotent — adding an already-present assignee or label succeeds silently. This closes the race window between interactive task creation and `/full-loop` startup where the pulse could dispatch a worker for the same issue.
+
 ### Step 0.7: Label Dispatch Model — `dispatched:{model}`
 
 Tag issue with model. Detect from `$ANTHROPIC_MODEL`/`$CLAUDE_MODEL` or system prompt. Map: `*opus*`→`dispatched:opus`, `*sonnet*`→`dispatched:sonnet`, `*haiku*`→`dispatched:haiku`. Remove stale labels first.

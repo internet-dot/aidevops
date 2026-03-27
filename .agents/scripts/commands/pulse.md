@@ -249,7 +249,7 @@ When closing any issue, ALWAYS comment first explaining why and linking to the P
 - **`status:blocked` but blockers resolved** → remove `status:blocked`, add `status:available`, comment what unblocked it. Dispatchable this cycle. Note: issues blocked by terminal blockers (GH#5141 — e.g., missing token scopes) are auto-detected during dispatch; the user must resolve the blocker and remove the label manually.
 - **Duplicate issues for same task ID** → keep the one referenced by `ref:GH#` in TODO.md, close others with a comment.
 - **Too large for one worker** → classify with `task-decompose-helper.sh classify`. If composite, decompose into subtask issues, label parent `status:blocked`. Child tasks enter the normal dispatch queue.
-- **`status:queued` or `status:in-progress`** → check `updatedAt`. If updated within 3 hours, skip. If 3+ hours with no PR and no worker, relabel `status:available`, unassign, comment the recovery.
+- **`status:queued` or `status:in-progress`** → check `updatedAt`. If updated within 3 hours, skip. If 3+ hours with no PR and no worker, relabel `status:available`, unassign, comment the recovery. Note: issues claimed at creation via `/new-task` option 2 (t1687) will have `status:in-progress` + assignee set immediately, so the pulse correctly skips them during the interactive work window.
 - **`needs-maintainer-review`** → SKIP. Awaiting maintainer review. Do NOT dispatch.
 - **`status:available` or no status (without `needs-maintainer-review`)** → dispatch a worker.
 
