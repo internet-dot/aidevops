@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.442] - 2026-03-28
+
+### Changed
+
+- Maintenance: raise simplification open-issue cap from 100 to 500 (#11272)
+- Refactor: reorganise .agents/ structure for scalability (#11127)
+- Maintenance: raise simplification scan rate from 5 to 200 issues per run (#11126)
+- Documentation: codify .agents/ architecture conventions for scalability (#11124)
+
+### Fixed
+
+- run complexity scan every pulse cycle (15 min) instead of daily (#11271)
+
 ## [3.1.439] - 2026-03-28
 
 ### Fixed
