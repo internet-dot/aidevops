@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.9] - 2026-03-28
+
+### Changed
+
+- Refactor: complete .agents/ structure cleanup (#11304)
+- Documentation: simplify UGC & Video Scripts agent doc (439→350 lines) (#11297)
+- Maintenance: update simplification state registry
+
 ## [3.2.7] - 2026-03-28
 
 ### Fixed
