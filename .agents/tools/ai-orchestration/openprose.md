@@ -18,29 +18,20 @@ tools:
 - **Repo**: <https://github.com/openprose/prose>
 - **Telemetry**: Disabled by default in aidevops. Override: `"OPENPROSE_TELEMETRY": "disabled"` in `.prose/state.json` or `--no-telemetry`
 
-**Install:**
-
-```bash
-# Claude Code
-claude plugin marketplace add https://github.com/openprose/prose.git
-claude plugin install open-prose@prose
-
-# OpenCode
-git clone https://github.com/openprose/prose.git ~/.config/opencode/skill/open-prose
-```
+**Install:** `claude plugin marketplace add https://github.com/openprose/prose.git && claude plugin install open-prose@prose` (Claude Code) or `git clone https://github.com/openprose/prose.git ~/.config/opencode/skill/open-prose` (OpenCode)
 
 ## Syntax
 
 ### Sessions & Agents
 
 ```prose
-session "Do something"                    # Simple session
-session: myAgent                          # With agent
+session "Do something"
+session: myAgent
   prompt: "Task prompt"
   context: previousResult
 
 agent researcher:
-  model: sonnet                           # sonnet | opus | haiku
+  model: sonnet                    # sonnet | opus | haiku
   prompt: "You are a research assistant"
   skills: ["web-search"]
 ```
@@ -48,25 +39,23 @@ agent researcher:
 ### Variables & Context
 
 ```prose
-let result = session "Get result"         # Mutable
-const config = session "Get config"       # Immutable
+let result = session "Get result"      # Mutable
+const config = session "Get config"    # Immutable
 session "Use both"
-  context: [result, config]               # Array form
-  context: { result, config }             # Object form
+  context: [result, config]            # Array or { result, config } object form
 ```
 
 ### Parallel Execution
 
 ```prose
-parallel:                                 # Default: wait for all
+parallel:                              # Default: wait for all
   a = session "Task A"
   b = session "Task B"
 
-parallel ("first"):                       # Race - first wins
-parallel ("any"):                         # First success
-parallel ("all"):                         # Wait for all (explicit)
-parallel (on-fail: "continue"):           # Let all complete
-parallel (on-fail: "ignore"):             # Treat failures as success
+# Strategies: "first" (race), "any" (first success), "all" (explicit wait-all)
+# Failure: on-fail: "continue" (let all complete) | "ignore" (treat failures as success)
+parallel ("first"):
+parallel (on-fail: "continue"):
 ```
 
 ### Loops
@@ -78,14 +67,11 @@ repeat 3:
 for topic in ["AI", "ML", "DL"]:
   session "Research" context: topic
 
-parallel for item in items:              # Fan-out
+parallel for item in items:            # Fan-out
   session "Process" context: item
 
-loop until **all tests pass** (max: 10):
+loop until **all tests pass** (max: 10):   # Also: loop while **condition** (max: N)
   session "Fix failing tests"
-
-loop while **there are items to process** (max: 50):
-  session "Process next item"
 ```
 
 ### Error Handling
@@ -126,13 +112,11 @@ block review(target):
   session "Performance review" context: target
 do review("src/")
 
+# Pipelines: filter → map → reduce (each step is an AI session)
 let results = items
-  | filter:
-      session "Keep? yes/no" context: item
-  | map:
-      session "Transform" context: item
-  | reduce(acc, item):
-      session "Combine" context: [acc, item]
+  | filter: session "Keep? yes/no" context: item
+  | map: session "Transform" context: item
+  | reduce(acc, item): session "Combine" context: [acc, item]
 ```
 
 ## Integration with aidevops
@@ -160,34 +144,26 @@ session "Synthesize all reviews"
 ### Development Loop with Quality Gates
 
 ```prose
-agent developer:
-  model: opus
-  prompt: "You are a senior developer"
+agent developer: model: opus, prompt: "Senior developer"
 
 loop until **task is complete** (max: 50):
-  session: developer
-    prompt: "Implement the feature, run tests, fix issues"
+  session: developer prompt: "Implement feature, run tests, fix issues"
 
 parallel:
-  lint = session "Run linters and fix issues"
-  types = session "Check types and fix issues"
-  tests = session "Run tests and fix failures"
+  lint = session "Run linters"
+  types = session "Check types"
+  tests = session "Run tests"
 
 if **any checks failed**:
   loop until **all checks pass** (max: 5):
-    session "Fix remaining issues"
-      context: { lint, types, tests }
+    session "Fix remaining issues" context: { lint, types, tests }
 
-let pr = session "Create pull request with gh pr create --fill"
+let pr = session "Create PR with gh pr create --fill"
 
 loop until **PR is merged** (max: 20):
-  parallel:
-    ci = session "Check CI status"
-    review = session "Check review status"
-  if **CI failed**:
-    session "Fix CI issues and push"
-  if **changes requested**:
-    session "Address review feedback and push"
+  parallel: ci = session "Check CI", review = session "Check reviews"
+  if **CI failed**: session "Fix CI issues and push"
+  if **changes requested**: session "Address review feedback and push"
 ```
 
 ## Related
