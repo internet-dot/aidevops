@@ -21,54 +21,28 @@ tools:
 - DSPy: Framework for algorithmically optimizing LLM prompts and weights
 - Requires: Python 3.8+, OpenAI/Anthropic API key
 - Helper: `./.agents/scripts/dspy-helper.sh install|test|init [project]`
-- Config: `configs/dspy-config.json` (copy from .txt template)
-- Projects: `data/dspy/[project-name]/`
-- Virtual env: `python-env/dspy-env/`
+- Config: `configs/dspy-config.json` (copy from `.json.txt` template); env vars take precedence
+- Projects: `data/dspy/[project-name]/` | Virtual env: `python-env/dspy-env/`
 - Key classes: Signature (define I/O), Module (logic), ChainOfThought (reasoning)
 - Optimizers: BootstrapFewShot (few-shot), COPRO (iterative), MIPRO (multi-stage)
-- API keys: Uses env vars `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`
+- API keys: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` (env vars override config file)
 
 <!-- AI-CONTEXT-END -->
 
 ## Setup
 
 ```bash
-# Install and verify
 ./.agents/scripts/dspy-helper.sh install
 ./.agents/scripts/dspy-helper.sh test
-
-# Configure
 cp configs/dspy-config.json.txt configs/dspy-config.json
-# Edit configs/dspy-config.json with API keys and settings
-
-# DSPy uses env vars (OPENAI_API_KEY, ANTHROPIC_API_KEY) over config file values
+# Edit configs/dspy-config.json — providers: openai (gpt-4, gpt-3.5-turbo), anthropic (claude-sonnet)
+./.agents/scripts/dspy-helper.sh init my-chatbot   # creates data/dspy/my-chatbot/
 ```
 
-## Project Structure
-
-```text
-aidevops/
-├── .agents/scripts/dspy-helper.sh    # DSPy management script
-├── configs/dspy-config.json          # DSPy configuration
-├── python-env/dspy-env/              # Python virtual environment
-├── data/dspy/                        # DSPy projects and datasets
-├── logs/                             # DSPy logs
-└── requirements.txt                  # Python dependencies
-```
-
-## Usage
-
-```bash
-# Create a new project
-./.agents/scripts/dspy-helper.sh init my-chatbot
-cd data/dspy/my-chatbot
-```
-
-### Basic Example
+## Basic Example
 
 ```python
-import dspy
-import os
+import dspy, os
 
 lm = dspy.OpenAI(model="gpt-3.5-turbo", api_key=os.getenv("OPENAI_API_KEY"))
 dspy.settings.configure(lm=lm)
@@ -91,7 +65,7 @@ result = qa(question="What is DSPy?")
 print(result.answer)
 ```
 
-### Optimization Example
+## Optimization Example
 
 ```python
 from dspy.teleprompt import BootstrapFewShot
@@ -114,23 +88,19 @@ result = compiled_qa(question="Explain neural networks")
 | COPRO | Iterative coordinate ascent | Complex reasoning tasks | `metric`, `breadth`, `depth` |
 | MIPRO | Multi-stage optimization | Multi-step reasoning | `metric`, `num_candidates` |
 
-## Configuration
-
-Language model providers and optimization settings are configured in `configs/dspy-config.json`. Supported providers: `openai` (gpt-4, gpt-3.5-turbo), `anthropic` (claude-sonnet). See the `.json.txt` template for the full schema.
-
 ## Best Practices
 
-1. **Start simple** -- begin with basic Signatures before adding ChainOfThought or optimization
-2. **Quality training data** -- use diverse examples with `.with_inputs('question')` for clear I/O patterns
-3. **Custom metrics** -- define metrics matching your use case (e.g., `example.answer.lower() in pred.answer.lower()`)
-4. **Iterate** -- test multiple optimizers (BootstrapFewShot, COPRO) with different configurations
+1. **Start simple** — basic Signatures before adding ChainOfThought or optimization
+2. **Quality training data** — diverse examples with `.with_inputs('question')` for clear I/O patterns
+3. **Custom metrics** — match your use case (e.g., `example.answer.lower() in pred.answer.lower()`)
+4. **Iterate** — test multiple optimizers (BootstrapFewShot, COPRO) with different configurations
 
 ## Troubleshooting
 
 | Issue | Fix |
 |-------|-----|
 | Import errors | Activate venv: `source python-env/dspy-env/bin/activate` |
-| API key issues | Verify env vars are set: `[[ -n "$OPENAI_API_KEY" ]] && echo "OPENAI_API_KEY is set" \|\| echo "OPENAI_API_KEY is missing"` |
+| API key issues | `[[ -n "$OPENAI_API_KEY" ]] && echo "set" \|\| echo "missing"` |
 | Memory issues | Reduce batch sizes: `dspy.settings.configure(lm=lm, max_tokens=1000)` |
 
 ## Resources
