@@ -31,8 +31,18 @@ Subsequent commits just need `git push`. When done: `gh pr ready`.
 **3. ShellCheck gate before push (MANDATORY for .sh files - t234)**
 
 ```bash
-sh_files=$(git diff --name-only origin/HEAD..HEAD 2>/dev/null | grep '\.sh$' || true)
-[[ -n "$sh_files" ]] && echo "$sh_files" | xargs shellcheck -x -S warning
+if command -v shellcheck &>/dev/null; then
+  sc_errors=0
+  while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    if ! shellcheck -x -S warning "$f"; then
+      sc_errors=$((sc_errors + 1))
+    fi
+  done < <(git diff --name-only origin/HEAD..HEAD 2>/dev/null | grep '\.sh$' || true)
+  [[ "$sc_errors" -gt 0 ]] && echo "ShellCheck: $sc_errors file(s) failed — fix before pushing" && exit 1
+else
+  echo "shellcheck not installed — skipping (note in PR body)"
+fi
 ```
 
 Do NOT push `.sh` files with violations. If `shellcheck` not installed, skip and note in PR body.
