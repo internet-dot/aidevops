@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.353] - 2026-03-30
+
+### Changed
+
+- Documentation: tighten flowcharts.md (161→134 lines, -17%, GH#13174) (#13523)
+
 ## [3.5.344] - 2026-03-30
 
 ### Changed
