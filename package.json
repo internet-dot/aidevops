@@ -1,9 +1,9 @@
 {
   "name": "aidevops",
 <<<<<<< Updated upstream
-  "version": "3.5.406",
+  "version": "3.5.408",
 =======
-  "version": "3.5.281",
+  "version": "3.5.408",
 >>>>>>> Stashed changes
   "description": "AI DevOps Framework - AI-assisted development workflows, code quality, and deployment automation",
   "type": "module",

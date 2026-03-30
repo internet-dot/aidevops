@@ -4,9 +4,9 @@
 # Usage: aidevops <command> [options]
 #
 <<<<<<< Updated upstream
-# Version: 3.5.406
+# Version: 3.5.408
 =======
-# Version: 3.5.281
+# Version: 3.5.408
 >>>>>>> Stashed changes
 
 set -euo pipefail
