@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.358] - 2026-03-30
+
+### Changed
+
+- Documentation: GH#12989: tighten Advantage+ Campaigns agent doc (#13535)
+
 ## [3.5.357] - 2026-03-30
 
 ### Changed
