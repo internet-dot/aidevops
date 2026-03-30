@@ -35,11 +35,9 @@ model: haiku
 | `pro` | gemini-2.5-pro | ~1.5x | >100K codebases + complex reasoning |
 | `opus` | claude-opus-4-6 | ~3x | Architecture, novel problems, security audits, complex trade-offs |
 
-**Model IDs**: Always fully-qualified (e.g., `claude-sonnet-4-6`, not `claude-sonnet-4`). Short-form causes `ProviderModelNotFoundError`. CLI prefix: `anthropic/`, `google/`.
+**Model IDs**: Always fully-qualified (e.g., `claude-sonnet-4-6`). Short-form causes `ProviderModelNotFoundError`. CLI prefix: `anthropic/`, `google/`.
 
 **`local` fallback**: Privacy → FAIL (require `--allow-cloud`). Cost → fall back to `composer2`.
-
-**Billing**: Subscription plans for regular use. API keys for testing/burst.
 
 ## Decision Flowchart
 
@@ -64,16 +62,16 @@ Privacy/on-device? → YES → local running? → YES: local | NO: FAIL
 | `pro` | gemini-2.5-pro | claude-sonnet-4-6 | No Google key |
 | `opus` | claude-opus-4-6 | gpt-5.4 | No Anthropic key |
 
-Supervisor resolves fallbacks automatically. Interactive: `compare-models-helper.sh discover`.
+Interactive: `compare-models-helper.sh discover`.
 
 ## Subagent Frontmatter
 
-Set `model: haiku` (or any tier) in YAML frontmatter. Absent → `sonnet`. `local` requires `local-model-helper.sh`; falls back to `composer2`.
+Set `model: haiku` (or any tier) in YAML frontmatter. Absent → `sonnet`. `local` requires `local-model-helper.sh` (falls back to `composer2`).
 
 ## Headless Dispatch
 
-- **Pulse supervisor**: Anthropic sonnet only — OpenAI models exit without activity (proven). Pin: `PULSE_MODEL=anthropic/claude-sonnet-4-6`.
-- **Workers**: Any provider. `AIDEVOPS_HEADLESS_MODELS` is rotation with backoff, not escalation. Tier escalation: use `tier:thinking` labels.
+- **Pulse**: Anthropic sonnet only (OpenAI models exit without activity). Pin: `PULSE_MODEL=anthropic/claude-sonnet-4-6`.
+- **Workers**: Any provider. `AIDEVOPS_HEADLESS_MODELS` rotates with backoff (not escalation). Use `tier:thinking` labels for tier escalation.
 - **Default**: `anthropic/claude-sonnet-4-6`.
 
 ```bash
@@ -110,11 +108,11 @@ bundle-helper.sh get model_defaults.implementation ~/Git/my-project
 bundle-helper.sh resolve ~/Git/my-project
 ```
 
-Integration: `cron-dispatch.sh` reads `model_defaults.implementation`; pulse uses `agent_routing`; `linters-local.sh` reads `skip_gates`.
+Used by: `cron-dispatch.sh` (implementation), pulse (agent_routing), `linters-local.sh` (skip_gates).
 
 ## Failure-Based Escalation (t1416)
 
-After 2 failed attempts, escalate to next tier (sonnet → opus via `--model anthropic/claude-opus-4-6`). One opus (~3x) < 3+ failed sonnet dispatches. Every dispatch/kill comment MUST include model tier for escalation auditing.
+After 2 failed attempts, escalate to next tier (sonnet → opus). One opus (~3x cost) < 3+ failed sonnet dispatches. Every dispatch/kill comment MUST include model tier for auditing.
 
 ## Tier Drift Detection (t1191)
 
@@ -123,7 +121,7 @@ After 2 failed attempts, escalate to next tier (sonnet → opus via `--model ant
 budget-tracker-helper.sh tier-drift [--json|--summary]
 ```
 
-Pulse Phase 12b checks hourly: >25% escalation → notice; >50% → warning.
+Pulse checks hourly: >25% escalation → notice; >50% → warning.
 
 ## Prompt Version Tracking (t1396)
 
