@@ -80,7 +80,7 @@ const overlays = [
   { text: "Welcome",            duration: { start: 0,  end: 3  }, ...titleStyle },
   { text: "Feature Overview",   duration: { start: 3,  end: 8  }, ...subtitleStyle },
   { text: "Analytics Dashboard",duration: { start: 8,  end: 15 }, ...lowerThirdStyle },
-  { text: "www.example.com",    duration: { start: 15, end: 20 }, ...ctaStyle },
+  { text: "www.example.com",    duration: { start: 15, end: 20 }, ...subtitleStyle },
 ];
 ```
 
