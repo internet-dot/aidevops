@@ -126,10 +126,12 @@ export async function onRequest(context) {
 export async function onRequest(context) {
   const url = new URL(context.request.url);
 
+  // Old paths
   if (url.pathname === '/old-page') {
     return Response.redirect(`${url.origin}/new-page`, 301);
   }
 
+  // Force HTTPS
   if (url.protocol === 'http:') {
     url.protocol = 'https:';
     return Response.redirect(url.toString(), 301);
@@ -153,10 +155,12 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
+    // Custom API
     if (url.pathname.startsWith('/api/')) {
       return new Response('API response');
     }
 
+    // Static assets
     return env.ASSETS.fetch(request);
   }
 } satisfies ExportedHandler<Env>;
