@@ -2619,3 +2619,7 @@ bash <(curl -fsSL https://aidevops.sh/install)
 ```
 
 **An AI operations platform for launching and managing projects across every business domain — from code to content, infrastructure to invoicing.**
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=marcusquinn/aidevops&type=Date)](https://star-history.com/#marcusquinn/aidevops&Date)
