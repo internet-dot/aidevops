@@ -5,7 +5,7 @@ Complex, multi-session work requiring research, design decisions, and detailed t
 Based on [OpenAI's PLANS.md](https://cookbook.openai.com/articles/codex_exec_plans) and [plan.md](https://github.com/Digital-Tvilling/plan.md), with TOON-enhanced parsing.
 
 <!--TOON:meta{version,format,updated}:
-1.0,plans-md+toon,2026-03-21T00:00:00Z
+1.0,plans-md+toon,2026-03-31T00:00:00Z
 -->
 
 ## Format
@@ -21,6 +21,64 @@ Each plan includes:
 - **Outcomes & Retrospective**: Results and lessons (when complete)
 
 ## Active Plans
+
+### [2026-03-31] Chromium Debug Use Live Chromium Session Skill
+
+**Status:** In Progress (Phase 1/4 after foundation)
+**Estimate:** ~6h (ai:4h test:45m read:1h15m)
+**TODOs:** t1706, t1707, t1708, t1709, t1710
+**PRs:** #14956 (foundation)
+**Logged:** 2026-03-31
+**Trigger:** User wants an aidevops-owned `chromium-debug-use` agent/skill for inspecting what is already open in a Chromium-based browser, teaching the user how to enable the required debugging path for that browser, and using the live session as a fast discovery step before formal automation planning.
+
+#### Purpose
+
+PR #14956 already landed the initial `chromium-debug-use` browser guide and baseline discovery links. The remaining gap is turning that foundation into a fuller worker-ready capability with explicit browser enablement guidance, a loadable skill/helper surface, deeper automation-planning handoff rules, and bounded future-scope documentation.
+
+V1 should optimize for the fastest path to answer: “help me understand or interact with what I already have open right now.” It should not replace Playwright, dev-browser, Stagehand, or Playwriter. Instead, it should provide a low-friction attach path, explicit consent model, and a clean handoff into the heavier tools when the task shifts from investigation to repeatable automation.
+
+#### Development Environment
+
+| Item | Value |
+|------|-------|
+| Language/runtime | Markdown, Bash 3.2 wrapper(s), Node.js 22+ for direct CDP/WebSocket access |
+| Install | Prefer zero npm install for v1 helper path; reuse repo conventions for shell helpers and tool docs |
+| Tests | `markdownlint-cli2` for new docs, `shellcheck` for any new shell helper, and a documented manual smoke check against a supported Chromium browser |
+| Do NOT | Replace the existing browser stack, require a browser extension for v1, or promise blanket Electron support before adapter constraints are documented |
+
+#### Linkage (The Pin)
+
+| Concept | Files | Lines | Synonyms |
+|---------|-------|-------|----------|
+| Existing-browser routing gap | `.agents/tools/browser/browser-automation.md` | 17-35, 69-79 | current browser, live session, browser selection |
+| Existing-browser automation baseline | `.agents/tools/browser/playwriter.md` | 23-35 | Playwriter, attached browser, extension attach |
+| Inspection/debugging companion | `.agents/tools/browser/chrome-devtools.md` | 21-25, 39-54 | DevTools MCP, debugging, network inspection |
+| Managed persistent browser alternative | `.agents/tools/browser/dev-browser.md` | 21-35, 161-170 | dev-browser, persistent profile, stateful automation |
+| Top-level browser routing entry | `.agents/build-plus.md` | 124-126 | browser automation, tool routing |
+
+#### Progress
+
+- [x] (2026-03-31 15:28Z) Foundation: initial `chromium-debug-use` browser guide and baseline discovery links landed via PR #14956 (`t1706`) ~1h
+- [ ] (2026-03-31 16:00Z) Phase 1: add the loadable skill entry point, helper wrapper, and richer attach operations for live Chromium sessions (`t1707`) ~2h
+- [ ] (2026-03-31 16:00Z) Phase 2: add per-browser enablement, consent, and safety guidance for Chrome-family browsers (`t1708`) ~1h
+- [ ] (2026-03-31 16:00Z) Phase 3: deepen browser tool routing and “inspect before automating” workflow guidance (`t1709`) ~1.5h
+- [ ] (2026-03-31 16:00Z) Phase 4: document the Electron/macOS extension envelope and recommended follow-up boundaries (`t1710`) ~1h
+
+#### Decision Log
+
+| Date | Decision | Rationale |
+|------|----------|-----------|
+| 2026-03-31 | Name the aidevops-owned capability `chromium-debug-use` | User explicitly wants that identity, and it distinguishes the tool from broader “browser-use” style automation claims. |
+| 2026-03-31 | Treat PR #14956 as shipped foundation and re-scope follow-ups around it | A pulse worker merged the initial guide before the planning commit landed, so the remaining tasks should build on that work instead of duplicating it. |
+| 2026-03-31 | Keep v1 Chromium-only | Chromium browsers expose the same CDP family and satisfy the immediate “current browser window/webapp” use case with lower complexity than cross-engine support. |
+| 2026-03-31 | Require explicit user approval before attaching to a live session | This is a more privileged attach path than isolated automation and should always be framed as opt-in local inspection. |
+| 2026-03-31 | Position the tool as investigation-first, not automation-stack replacement | Playwright, Stagehand, dev-browser, Playwriter, and DevTools MCP already cover repeatable automation, self-healing, or deep analysis better once the session has been understood. |
+| 2026-03-31 | Treat Electron and macOS automation as extension paths, not promised v1 scope | Electron support varies by app launch model and exposed debugging endpoint; macOS automation is valuable mainly for focus/discovery/handoff rather than DOM control. |
+
+#### Surprises & Discoveries
+
+- The upstream `chrome-cdp-skill` model proves there is a small-footprint Node 22+ path with no npm install and a daemonized attach model, so the main aidevops work is packaging, consent, routing, and verification rather than raw protocol feasibility.
+- A pulse worker merged the initial browser guide from issue creation alone before the TODO/plan commit landed, which means follow-up planning must account for live GitHub state instead of assuming a clean queue.
 
 ### [2026-03-27] Context Token Optimization — Reduce Session Baseline
 
