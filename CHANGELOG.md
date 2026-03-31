@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.467] - 2026-03-31
+
+### Changed
+
+- Maintenance: tighten aeo-geo-patterns.md headings and MD031 compliance (#14488)
+
 ## [3.5.466] - 2026-03-31
 
 ### Changed
