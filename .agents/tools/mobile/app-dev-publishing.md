@@ -33,11 +33,11 @@ asc auth login --key-id KEY --issuer-id ISSUER --private-key-path ~/.asc/AuthKey
 asc apps list
 ```
 
+Use `asc` for App Store Connect operations; the checklists below cover submission compliance.
+
 ## Apple App Store
 
 ### Pre-Submission Checklist
-
-**Required**:
 
 - [ ] Active Apple Developer Program membership
 - [ ] App builds and runs without crashes
@@ -51,25 +51,16 @@ asc apps list
 - [ ] App category selected
 - [ ] Support URL provided
 - [ ] Contact information for review team
-
-**If accounts**:
-
-- [ ] Account deletion feature (required since 2022)
-- [ ] Demo account credentials for review team
-- [ ] Sign in with Apple supported (if any third-party sign-in exists)
-
-**If payments**:
-
-- [ ] In-app purchases configured in App Store Connect
-- [ ] Subscription terms clearly displayed before purchase
-- [ ] Restore purchases button accessible
-- [ ] No external payment links (App Store guideline 3.1.1)
-
-**If social features**:
-
-- [ ] Block/report functionality
-- [ ] Content moderation plan
-- [ ] User-generated content guidelines
+- [ ] Account deletion feature (accounts; required since 2022)
+- [ ] Demo account credentials for review team (accounts)
+- [ ] Sign in with Apple supported (accounts with third-party sign-in)
+- [ ] In-app purchases configured in App Store Connect (payments)
+- [ ] Subscription terms clearly displayed before purchase (payments)
+- [ ] Restore purchases button accessible (payments)
+- [ ] No external payment links (payments; App Store guideline 3.1.1)
+- [ ] Block/report functionality (social features)
+- [ ] Content moderation plan (social features)
+- [ ] User-generated content guidelines (social features)
 
 ### Common Rejection Reasons
 
@@ -93,9 +84,7 @@ asc apps list
 | iPad Pro 13" | 2064 x 2752 | If iPad supported |
 | iPad Pro 12.9" | 2048 x 2732 | If iPad supported |
 
-- Show the app in use, not empty states; highlight key features with captions
-- Use consistent style; first screenshot is most important (shown in search results)
-- Use Remotion to create animated App Store preview videos (up to 30 seconds)
+Tips: show the app in use, not empty states; highlight key features with captions; keep a consistent style; prioritize the first screenshot because it appears in search results; use Remotion to create animated App Store preview videos (up to 30 seconds).
 
 ### App Review Process
 
@@ -107,8 +96,6 @@ asc apps list
 
 ### Pre-Submission Checklist
 
-**Required**:
-
 - [ ] Google Play Developer account
 - [ ] Privacy policy URL
 - [ ] App description (up to 4000 characters)
@@ -119,9 +106,6 @@ asc apps list
 - [ ] Content rating questionnaire completed
 - [ ] Target audience and content declarations
 - [ ] Data safety section completed
-
-**Android-specific**:
-
 - [ ] AAB (Android App Bundle) format (not APK)
 - [ ] Target API level meets current requirement
 - [ ] 64-bit support
@@ -135,13 +119,10 @@ asc apps list
 
 ## Metadata Optimisation (ASO)
 
-**App name**: Primary keyword naturally included; ≤30 chars (Apple) / ≤50 chars (Google); brand + keyword pattern.
-
-**Keywords (Apple)**: 100 char limit, comma-separated, no repeats from app name, singular forms, no spaces after commas.
-
-**Description**: First 3 lines visible without "Read More" — lead with core value proposition. Short paragraphs, bullet points, social proof, call to action.
-
-**Localisation**: Localise metadata for target markets even if app is English-only. Localised screenshots improve conversion. Top markets: US, UK, Germany, Japan, Brazil, France.
+- **App name**: Include the primary keyword naturally; ≤30 chars (Apple) / ≤50 chars (Google); prefer brand + keyword.
+- **Keywords (Apple)**: 100-character limit, comma-separated, no repeats from app name, singular forms, no spaces after commas.
+- **Description**: Lead with the core value proposition in the first 3 lines; use short paragraphs, bullet points, social proof, and a call to action.
+- **Localisation**: Localise metadata for target markets even if the app is English-only. Localised screenshots improve conversion. Top markets: US, UK, Germany, Japan, Brazil, France.
 
 ## Related
 
