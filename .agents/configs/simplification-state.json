@@ -1062,9 +1062,9 @@
       "pr": 14484
     },
     ".agents/scripts/commands/postflight-loop.md": {
-      "hash": "c78f879537d08532f631523c4021e7ebc9f462ff",
-      "at": "2026-03-31T14:55:57Z",
-      "pr": 14942
+      "hash": "bac68676a8291dc0c84e4f52c76ea7d01fdc51eb",
+      "at": "2026-03-31T15:48:00Z",
+      "pr": 14995
     },
     ".agents/scripts/commands/routine.md": {
       "hash": "2f4f41fc7eb38924a7bceaa39ef60657f92e48ba",
