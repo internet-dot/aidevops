@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.518] - 2026-03-31
+
+### Changed
+
+- Documentation: tighten datasets.md agent doc wording (#14819)
+- Documentation: tighten worker-efficiency-protocol.md (122→120 lines, 12% byte reduction) (#14723)
+- Maintenance: tighten orbstack.md agent doc (121→75 lines) (#14746)
+- Documentation: tighten datasets.md agent doc (121→101 lines) (#14754)
+- Documentation: tighten email-verification.md agent doc (121 -> 95 lines) (#14757)
+- Maintenance: tighten pre-edit.md agent doc (118 -> 80 lines) (#14778)
+- Maintenance: tighten git-security.md agent doc (118 -> 95 lines) (#14780)
+- Documentation: tighten skill-scanner.md (118 -> 98 lines) (#14784)
+- Documentation: tighten geo-strategy.md agent doc (118 -> 106 lines) (#14785)
+- Documentation: tighten heygen-skill.md index — remove verbose sections, use tables (#14786)
+- Documentation: tighten list-todo.md (117 -> 62 lines) (#14793)
+- Documentation: tighten landing-page-structure agent doc (117 -> 103 lines) (#14795)
+
 ## [3.5.517] - 2026-03-31
 
 ### Changed
