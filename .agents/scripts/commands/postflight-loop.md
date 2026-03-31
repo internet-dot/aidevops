@@ -6,27 +6,27 @@ mode: subagent
 
 Monitor release health after deployment. Arguments: `$ARGUMENTS`
 
-## Usage
+**Usage**
 
 ```bash
 /postflight-loop [--monitor-duration 5m] [--max-iterations 5]
 ```
 
-## Core Contract
+**Contract**
 
-1. Parse `$ARGUMENTS` into `monitor_duration` and `max_iterations`.
-2. On each pass, use `gh` to verify the latest CI status, release tag presence, and `VERSION` ↔ release-tag match.
-3. Record status, iteration, elapsed time, last check, and per-check results in `.agents/loop-state/quality-loop.local.md`.
-4. Emit `<promise>RELEASE_HEALTHY</promise>` only when every check passes inside the monitoring window.
+- Parse `$ARGUMENTS` into `monitor_duration` and `max_iterations`.
+- On each pass, use `gh` to verify latest CI status, release tag presence, and `VERSION` matches the released tag.
+- Record status, iteration, elapsed time, last check, and per-check results in `.agents/loop-state/quality-loop.local.md`.
+- Emit `<promise>RELEASE_HEALTHY</promise>` only when every check passes inside the monitoring window.
 
-## Options
+**Options**
 
 | Option | Purpose | Default |
 |--------|---------|---------|
 | `--monitor-duration <t>` | Total monitoring window such as `5m`, `10m`, or `1h` | `5m` |
 | `--max-iterations <n>` | Max monitoring passes | `5` |
 
-## Examples
+**Examples**
 
 ```bash
 /postflight-loop --monitor-duration 10m
@@ -34,11 +34,11 @@ Monitor release health after deployment. Arguments: `$ARGUMENTS`
 /postflight-loop --monitor-duration 2m --max-iterations 3
 ```
 
-## Use When
+**Use when**
 
-- After `/release`, a manual release, or CI/CD verification
+- After `/release`, a manual release, or CI/CD verification.
 
-## Related
+**Related**
 
 - `/postflight` — single postflight check
 - `/release` — full release workflow
