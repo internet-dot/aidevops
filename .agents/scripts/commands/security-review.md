@@ -1,17 +1,13 @@
 # /security-review
 
-Review quarantined security items and provide feedback to improve detection accuracy.
+Review ambiguous security items that were flagged but not auto-blocked, then feed the decision back into the security config.
 
-## What it does
+## Review sources
 
-Presents a digest of ambiguous security items that were flagged but not automatically blocked. These items come from:
-
-- **prompt-guard-helper.sh** — WARN-level prompt injection detections (below block threshold)
-- **network-tier-helper.sh** — Tier 4 unknown domains (allowed but flagged)
-- **sandbox-exec-helper.sh** — Tier 5 denied domains from sandbox pre-checks
-- **mcp-audit** — MCP tool descriptions with ambiguous injection patterns
-
-Each item can be reviewed and a decision applied that feeds back into the security configuration, creating a self-improving feedback loop.
+- `prompt-guard-helper.sh` — WARN-level prompt injection detections below the block threshold
+- `network-tier-helper.sh` — Tier 4 unknown domains that were allowed but flagged
+- `sandbox-exec-helper.sh` — Tier 5 denied domains from sandbox pre-checks
+- `mcp-audit` — MCP tool descriptions with ambiguous injection patterns
 
 ## Usage
 
@@ -49,36 +45,34 @@ quarantine-helper.sh purge --older-than 60 --reviewed-only
 
 | Action | Effect | Config file modified |
 |--------|--------|---------------------|
-| `allow` | Add domain to Tier 3 (known tools, allowed + logged) | `~/.config/aidevops/network-tiers-custom.conf` |
-| `deny` | Add domain to Tier 5 (blocked) or pattern to prompt guard deny list | `network-tiers-custom.conf` (for network-tier/sandbox-exec sources) or `prompt-guard-custom.txt` (for prompt-guard/mcp-audit sources) |
-| `trust` | Add MCP server to trusted list | `~/.config/aidevops/mcp-trusted-servers.txt` |
-| `dismiss` | Mark as false positive, no config change | None (recorded in reviewed.jsonl) |
+| `allow` | Add domain to Tier 3 so future access is allowed and logged | `~/.config/aidevops/network-tiers-custom.conf` |
+| `deny` | Add a domain to Tier 5 or a pattern to the prompt-guard deny list | `network-tiers-custom.conf` (network-tier / sandbox-exec) or `prompt-guard-custom.txt` (prompt-guard / mcp-audit) |
+| `trust` | Add an MCP server to the trusted list | `~/.config/aidevops/mcp-trusted-servers.txt` |
+| `dismiss` | Mark as false positive without config changes; recorded in `reviewed.jsonl` | None |
 
-## Feedback loop
+## Effect of each decision
 
-Each review decision improves future accuracy:
+1. `allow` reduces repeat noise for legitimate domains.
+2. `deny` blocks known-bad domains or prompt patterns.
+3. `trust` suppresses false positives from approved MCP servers.
+4. `dismiss` records false positives so `quarantine-helper.sh stats` can track accuracy.
 
-1. **allow** decisions add domains to Tier 3, so future access to that domain is logged but not flagged
-2. **deny** decisions add domains to Tier 5 (blocked) or patterns to the prompt guard custom deny list
-3. **trust** decisions whitelist MCP servers so their tool descriptions are not flagged
-4. **dismiss** decisions are recorded as false positives — the `stats` command tracks the false positive rate
-
-Over time, the quarantine queue shrinks as the system learns which domains, patterns, and servers are legitimate vs malicious.
+Over time, the quarantine queue shrinks as the system learns which domains, patterns, and servers are legitimate.
 
 ## Queue files
 
-- **Pending**: `~/.aidevops/.agent-workspace/security/quarantine/pending.jsonl`
-- **Reviewed**: `~/.aidevops/.agent-workspace/security/quarantine/reviewed.jsonl`
+- Pending: `~/.aidevops/.agent-workspace/security/quarantine/pending.jsonl`
+- Reviewed: `~/.aidevops/.agent-workspace/security/quarantine/reviewed.jsonl`
 
-## When to run
+## Run when
 
-- After a batch of headless worker sessions (pulse/dispatch)
-- When the quarantine queue has accumulated items (check with `quarantine-helper.sh stats`)
-- As part of a periodic security review cadence
+- After headless worker batches (`pulse` / dispatch)
+- When `quarantine-helper.sh stats` shows queue growth
+- During periodic security review
 
 ## Related
 
-- `prompt-guard-helper.sh` — Prompt injection detection
-- `network-tier-helper.sh` — Network domain tiering
-- `sandbox-exec-helper.sh` — Execution sandboxing
-- `tools/security/prompt-injection-defender.md` — Security architecture
+- `prompt-guard-helper.sh` — prompt injection detection
+- `network-tier-helper.sh` — network domain tiering
+- `sandbox-exec-helper.sh` — execution sandboxing
+- `tools/security/prompt-injection-defender.md` — security architecture
