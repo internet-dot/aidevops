@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.538] - 2026-03-31
+
+### Changed
+
+- Documentation: tighten model-specific subagent routing guide (#15012)
+
 ## [3.5.537] - 2026-03-31
 
 ### Changed
