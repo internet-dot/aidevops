@@ -14,7 +14,7 @@ tools:
 
 # Cloudron App Packaging (Official Skill)
 
-A Cloudron app is a Docker image with a `CloudronManifest.json`. Readonly filesystem, addon services, managed backup/restore lifecycle.
+A Cloudron app is a Docker image plus `CloudronManifest.json`. Expect a readonly app filesystem, addon-provided services, and platform-managed backup/restore.
 
 <!-- AI-CONTEXT-START -->
 
@@ -22,7 +22,7 @@ A Cloudron app is a Docker image with a `CloudronManifest.json`. Readonly filesy
 
 - **Upstream**: [git.cloudron.io/docs/skills](https://git.cloudron.io/docs/skills) (`cloudron-app-packaging`) | [docs.cloudron.io/packaging](https://docs.cloudron.io/packaging/)
 - **Reference files**: `cloudron-app-packaging-skill/manifest-ref.md`, `cloudron-app-packaging-skill/addons-ref.md`
-- **Also see**: `cloudron-app-packaging.md` (native aidevops guide — helper scripts, local dev workflow, detailed Dockerfile/start.sh patterns, pre-packaging assessment)
+- **Implementation guide**: `cloudron-app-packaging.md` (aidevops-native workflow, helper scripts, detailed Dockerfile/start.sh patterns, pre-packaging assessment)
 
 <!-- AI-CONTEXT-END -->
 
@@ -30,11 +30,11 @@ A Cloudron app is a Docker image with a `CloudronManifest.json`. Readonly filesy
 
 | Constraint | Detail |
 |------------|--------|
-| Filesystem readonly | Writable: `/tmp`, `/run` (ephemeral), `/app/data` (persisted, requires `localstorage` addon) |
-| Addons for services | Databases, caching, email, auth via addons — env vars injected at runtime, re-read every start |
-| Manifest declares all | `CloudronManifest.json`: metadata, ports, addon requirements |
-| HTTP only | App listens HTTP — platform handles TLS |
-| Memory default | 256 MB (RAM + swap). Set `memoryLimit` in manifest |
+| Filesystem readonly | Writable paths: `/tmp`, `/run` (ephemeral), `/app/data` (persisted, usually via `localstorage`) |
+| Addons for services | Databases, cache, mail, auth come from addons; re-read injected env vars every start |
+| Manifest declares all | `CloudronManifest.json` defines metadata, ports, and addon requirements |
+| HTTP only | App serves HTTP; Cloudron terminates TLS |
+| Memory default | Default limit is 256 MB (RAM + swap); raise with `memoryLimit` |
 
 ## Build Methods (9.1+)
 
@@ -46,7 +46,7 @@ A Cloudron app is a Docker image with a `CloudronManifest.json`. Readonly filesy
 
 ## Dockerfile Patterns
 
-Name: `Dockerfile`, `Dockerfile.cloudron`, or `cloudron/Dockerfile`. See `cloudron-app-packaging.md` "Dockerfile Patterns" for runtime-specific patterns (PHP, Node, Python, nginx, Apache).
+Use `Dockerfile`, `Dockerfile.cloudron`, or `cloudron/Dockerfile`. For runtime-specific patterns (PHP, Node, Python, nginx, Apache), see `cloudron-app-packaging.md` "Dockerfile Patterns".
 
 ```dockerfile
 FROM cloudron/base:5.0.0@sha256:...
@@ -60,12 +60,12 @@ CMD [ "/app/code/start.sh" ]
 
 ### start.sh Conventions
 
-- Runs as root — drop privileges: `exec gosu cloudron:cloudron <cmd>`
-- Fix ownership every start (backups reset it): `chown -R cloudron:cloudron /app/data`
-- Forward SIGTERM with `exec`: `exec gosu cloudron:cloudron node /app/code/server.js`
-- First-run marker: `if [[ ! -f /app/data/.initialized ]]; then ...; touch /app/data/.initialized; fi`
-- Log to stdout/stderr (platform rotates). Fallback: `/run/<subdir>/*.log` (two levels deep, autorotated)
-- Multi-process: use `supervisor` or `pm2`. See `cloudron-app-packaging.md` "start.sh Architecture" for supervisord config and memory-aware worker count
+- Drop privileges before the main process: `exec gosu cloudron:cloudron <cmd>`
+- Fix ownership on each start because restores can reset it: `chown -R cloudron:cloudron /app/data`
+- Use `exec` so SIGTERM reaches the app: `exec gosu cloudron:cloudron node /app/code/server.js`
+- Gate first-run initialization with a marker file: `if [[ ! -f /app/data/.initialized ]]; then ...; touch /app/data/.initialized; fi`
+- Log to stdout/stderr; fallback logs belong under `/run/<subdir>/*.log`
+- For multi-process apps, use `supervisor` or `pm2`; see `cloudron-app-packaging.md` "start.sh Architecture"
 
 ## Manifest Essentials
 
@@ -88,7 +88,7 @@ Full field reference: [manifest-ref.md](cloudron-app-packaging-skill/manifest-re
 
 | Addon | Provides | Key env var |
 |-------|----------|-------------|
-| `localstorage` | Writable `/app/data` + backup | -- |
+| `localstorage` | Writable `/app/data` with backup coverage | -- |
 | `mysql` | MySQL 8.0 | `CLOUDRON_MYSQL_URL` |
 | `postgresql` | PostgreSQL 14.9 | `CLOUDRON_POSTGRESQL_URL` |
 | `mongodb` | MongoDB 8.0 | `CLOUDRON_MONGODB_URL` |
@@ -100,14 +100,14 @@ Full field reference: [manifest-ref.md](cloudron-app-packaging-skill/manifest-re
 | `tls` | App certificate files | `/etc/certs/tls_cert.pem` |
 | `docker` | Create containers (restricted) | `CLOUDRON_DOCKER_HOST` |
 
-Full env var lists and options: [addons-ref.md](cloudron-app-packaging-skill/addons-ref.md).
+Full env vars and addon options: [addons-ref.md](cloudron-app-packaging-skill/addons-ref.md).
 
 ## Stack Notes
 
-- **Apache** — Disable default sites, `Listen 8000`, errors to stderr, `exec /usr/sbin/apache2 -DFOREGROUND`
-- **Nginx** — `/run/` for temp paths (`client_body_temp_path`, `proxy_temp_path`). Run with supervisor.
-- **PHP** — Sessions to `/run/php/sessions` via symlink
-- **Java** — Read cgroup memory limit, set `-XX:MaxRAM`
+- **Apache** — Disable default sites, `Listen 8000`, send errors to stderr, `exec /usr/sbin/apache2 -DFOREGROUND`
+- **Nginx** — Put temp paths under `/run/` (`client_body_temp_path`, `proxy_temp_path`); run with supervisor
+- **PHP** — Symlink sessions into `/run/php/sessions`
+- **Java** — Read the cgroup memory limit and set `-XX:MaxRAM`
 
 ## Debugging
 
@@ -118,6 +118,6 @@ cloudron debug           # pause app (read-write fs)
 cloudron debug --disable # exit debug mode
 ```
 
-## Examples
+## Reference Packages
 
-All published apps are open source: https://git.cloudron.io/packages — browse by framework: [PHP](https://git.cloudron.io/explore/projects?tag=php) | [Node](https://git.cloudron.io/explore/projects?tag=node) | [Python](https://git.cloudron.io/explore/projects?tag=python) | [Ruby/Rails](https://git.cloudron.io/explore/projects?tag=rails) | [Java](https://git.cloudron.io/explore/projects?tag=java) | [Go](https://git.cloudron.io/explore/projects?tag=go) | [Rust](https://git.cloudron.io/explore/projects?tag=rust)
+All published apps are open source: https://git.cloudron.io/packages. Browse by framework: [PHP](https://git.cloudron.io/explore/projects?tag=php) | [Node](https://git.cloudron.io/explore/projects?tag=node) | [Python](https://git.cloudron.io/explore/projects?tag=python) | [Ruby/Rails](https://git.cloudron.io/explore/projects?tag=rails) | [Java](https://git.cloudron.io/explore/projects?tag=java) | [Go](https://git.cloudron.io/explore/projects?tag=go) | [Rust](https://git.cloudron.io/explore/projects?tag=rust)
