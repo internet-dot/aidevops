@@ -1,19 +1,23 @@
 # Secret Handling Reference
 
-Detailed rules for preventing credential exposure in AI agent sessions. These
-rules were extracted from `prompts/build.txt` sections 8.1–8.4 to keep the
-system prompt concise while preserving the full guidance here.
+Detailed rules for preventing credential exposure in AI agent sessions. This
+file holds the expanded guidance behind `prompts/build.txt` sections 8.1–8.4.
 
-**Trigger rules in build.txt:** NEVER expose credentials in output/logs. Treat
+**Trigger rule in build.txt:** NEVER expose credentials in output/logs. Treat
 command output as transcript-visible. Full rules: `reference/secret-handling.md`.
 
----
+## Core Rules
+
+- Treat tool input and stdout/stderr as transcript-visible by default.
+- Never run, suggest, or paste commands that print secret values into chat.
+- Pass secrets via environment variables, never command arguments.
+- Query config structure and safe fields first; never dump raw records that may contain embedded credentials.
 
 ## 8.1 Session Transcript Exposure (t1457)
 
-**Threat:** Users assume "terminal command" means private, but commands run by
-AI tools and their output are usually captured in session transcripts and may be
-sent to a remote model provider in cloud-model mode.
+**Threat:** Users often assume "terminal command" means private. In AI sessions,
+tool input and output usually enter the transcript and may reach a remote model
+provider in cloud-model mode.
 
 - Treat command input + stdout/stderr as transcript-visible by default. If printing it would be a secret leak in chat, it is also a leak in tool output.
 - When giving secret setup instructions, start with an explicit warning line: `WARNING: Never paste secret values into AI chat. Run the command in your terminal and enter the value at the hidden prompt.`
@@ -21,18 +25,15 @@ sent to a remote model provider in cloud-model mode.
 - Avoid workflows that write raw secrets to temporary files (for example `/tmp/*.json`) unless there is no alternative and cleanup is immediate; prefer in-memory piping when possible.
 - If a command can expose secrets and no safe alternative exists, do not run it via AI tools. Instruct the user to run it locally and do not request pasted output.
 
----
-
 ## 8.2 Secret Value Leaking in Conversation (t2846)
 
-**Threat:** Agent suggests or runs commands whose output contains secret values,
-exposing credentials in the conversation transcript. Transcripts are stored on
-disk and may be synced, logged, or visible to other tools. Once a secret appears
-in conversation, it must be rotated — the damage is done.
+**Threat:** The agent suggests or runs a command whose output contains secret
+values, leaking them into the conversation transcript. Once a secret appears in
+conversation, treat it as compromised and rotate it.
 
-**Root cause:** Agents pattern-match on "I need to check the value" and reach
-for the obvious command (`gopass show`, `cat .env`, `pm2 env`) without
-considering that the output enters the conversation context.
+**Root cause:** Agents pattern-match on "check the value" and reach for the
+obvious command (`gopass show`, `cat .env`, `pm2 env`) without considering that
+the output becomes conversation context.
 
 **Incident:** ILDS t006 session — Zoho OAuth credentials exposed, required rotation.
 
@@ -62,15 +63,11 @@ considering that the output enters the conversation context.
   - Do NOT repeat, echo, or reference the pasted credential value in your response
   - Continue helping with the task using a placeholder like `<YOUR_API_KEY>` instead
 
----
-
 ## 8.3 Secret as Command Argument Exposure (t4939)
 
-**Threat:** A secret passed as a command argument (not an env var) can be echoed
-back in error messages, appear in `ps` output, and leak into logs — even when
-the command's *intent* is safe (e.g., a DB insert). The agent assesses the
-command as safe because it's not a `cat` or `echo`, but any program can print
-its argv on failure. Error paths are invisible at invocation time.
+**Threat:** A secret passed as a command argument can appear in error messages,
+`ps` output, and logs — even when the command's intent is safe. The failure path
+is the leak.
 
 **Incident:** qs-agency migration — WEBHOOK_SECRET interpolated into `wp db query`
 SQL argument, WP-CLI printed the full argument on parse failure, secret entered
@@ -90,23 +87,18 @@ conversation transcript. Required immediate rotation.
 ### Post-Execution Secret Detection (t4939, layer 2)
 
 After any Bash command whose input references a credential variable (`gopass`,
-`$*_SECRET`, `$*_TOKEN`, `$*_KEY`, `$*_PASSWORD`), verify the output doesn't
-contain the secret value before presenting it to the user.
+`$*_SECRET`, `$*_TOKEN`, `$*_KEY`, `$*_PASSWORD`), verify the output does not
+contain the secret value before presenting it.
 
 - After running any command that references a credential variable, assess whether the output could contain the secret value. If the command failed (non-zero exit) and the secret was passed as an argument (violating 8.3), assume the output is contaminated — do not present it to the user. Flag for immediate credential rotation.
 - This is a judgment call, not a regex check. The agent knows which variables contain secrets and can assess whether output looks like it contains credential material (long base64 strings, API key patterns, JSON with auth fields).
 
----
-
 ## 8.4 Application Config Contains Embedded Credentials (t4954)
 
-**Threat:** Application configuration tables (webhook settings, integration
-records, OAuth configs, API endpoint metadata) store authenticated callback URLs
-with secrets as query parameters (e.g., `?secret=<value>`). A general
-`SELECT *` or `SELECT value` on these tables returns the full record including
-embedded credentials — even though the command itself doesn't reference any
-credential variable. Sections 8.3 and post-execution detection don't catch this
-because the secret isn't passed as an argument or referenced as a variable.
+**Threat:** Application config often stores authenticated callback URLs with
+embedded query-string secrets (for example `?secret=<value>`). A general
+`SELECT *` or `SELECT value` can leak those credentials even when the command
+does not reference any credential variable.
 
 **Incident:** FluentForms webhook config queried via `wp db query`, output
 contained `request_url` with `?secret=<value>`. Required immediate rotation.
