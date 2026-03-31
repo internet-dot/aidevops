@@ -1,8 +1,9 @@
 # Cron Triggers Gotchas
 
-## Timezone Issues
+## Time and propagation
 
-**⚠️ UTC ONLY** - No timezone configuration
+- **UTC only** — cron triggers have no timezone setting.
+- **Propagation delay** — trigger changes can take up to 15 minutes. Verify in Dashboard → Workers → Select Worker → Settings → Triggers.
 
 ```typescript
 // ❌ Wrong: "0 9 * * *" // 9am UTC, not local
@@ -10,11 +11,7 @@
 // Calculate: utcHour = (localHour - utcOffset + 24) % 24
 ```
 
-## Propagation Delay
-
-**Changes take up to 15 minutes**. Verify: Dashboard → Workers → Select Worker → Settings → Triggers
-
-## Limits
+## Limits and long-running work
 
 | Plan | Triggers/Worker | CPU Time | Execution |
 |------|----------------|----------|-----------|
@@ -27,9 +24,9 @@
 // ✅ OR: await env.WORKFLOW.create({});
 ```
 
-## Duplicate Executions
+## Duplicate executions
 
-**At-least-once delivery** - duplicates possible. Make idempotent:
+At-least-once delivery means duplicates are possible; make scheduled handlers idempotent.
 
 ```typescript
 export default {
@@ -43,9 +40,9 @@ export default {
 };
 ```
 
-## Debugging Not Executing
+## Not executing
 
-**Check:** `scheduled()` exported, recent deploy, 15min wait, valid cron ([crontab.guru](https://crontab.guru/)), plan limits
+Check: `scheduled()` exported, recent deploy, 15-minute wait elapsed, valid cron ([crontab.guru](https://crontab.guru/)), and plan limits.
 
 ```typescript
 export default {
@@ -56,9 +53,9 @@ export default {
 };
 ```
 
-## Execution Failures
+## Execution failures
 
-**Common:** CPU exceeded, unhandled exceptions, network timeouts, binding misconfiguration
+Common causes: CPU exceeded, unhandled exceptions, network timeouts, and binding misconfiguration.
 
 ```typescript
 export default {
@@ -78,9 +75,11 @@ export default {
 };
 ```
 
-## Local Testing Issues
+## Local testing
 
-Ensure `wrangler dev` runs, `scheduled()` exists, update Wrangler: `npm i -g wrangler@latest`
+- Ensure `wrangler dev` runs.
+- Ensure `scheduled()` exists.
+- Update Wrangler if needed: `npm i -g wrangler@latest`.
 
 ```bash
 curl "http://localhost:8787/__scheduled?cron=*/5+*+*+*+*" # URL encode spaces
@@ -88,7 +87,7 @@ curl "http://localhost:8787/__scheduled" # No params = default
 # Python: curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+*+*+*+*"
 ```
 
-## Security
+## Dev-only trigger endpoint
 
 ```typescript
 export default {
@@ -105,7 +104,7 @@ export default {
 };
 ```
 
-## Secrets Management
+## Secrets management
 
 ```typescript
 // ❌ BAD: headers: { "Authorization": "Bearer sk_live_abc123..." }
@@ -118,7 +117,7 @@ npx wrangler secret put API_KEY
 
 ## Green Compute
 
-Dashboard: Workers & Pages → Account details → Compute Setting → Green Compute. Tradeoffs: fewer locations, higher latency, ideal for non-time-critical jobs
+Dashboard: Workers & Pages → Account details → Compute Setting → Green Compute. Tradeoffs: fewer locations, higher latency, ideal for non-time-critical jobs.
 
 ## Resources
 
