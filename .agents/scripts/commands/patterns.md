@@ -11,7 +11,7 @@ Arguments: `$ARGUMENTS`
 
 ## Instructions
 
-1. Query memory for all pattern types:
+Query all pattern types:
 
 ```bash
 ~/.aidevops/agents/scripts/memory-helper.sh recall "success pattern" --type SUCCESS_PATTERN --limit 20
@@ -20,19 +20,11 @@ Arguments: `$ARGUMENTS`
 ~/.aidevops/agents/scripts/memory-helper.sh recall "failed approach" --type FAILED_APPROACH --limit 10
 ```
 
-2. Apply mode from arguments:
-   - Contains `recommend` → prioritize model-tier recommendation from observed outcomes.
-   - Contains `report` → return full pattern summary.
-   - Otherwise → return concise task-focused suggestions.
+**Modes** (from `$ARGUMENTS`): `recommend` → model-tier recommendation from outcomes | `report` → full pattern summary | default → concise task-focused suggestions. Filter to task-relevant patterns when arguments are provided.
 
-3. If arguments are provided, filter findings to task-relevant patterns.
+**Output order:** What works (repeated successes) → What fails (repeated failures/regressions) → Recommended tier (with rationale from evidence).
 
-4. Present output in this order:
-   - **What works:** approaches with repeated success in similar tasks
-   - **What fails:** approaches with repeated failure or regressions
-   - **Recommended tier:** best model tier with short rationale from pattern evidence
-
-5. If no patterns exist, return:
+**No patterns fallback:**
 
 ```text
 No patterns recorded yet. Patterns are recorded automatically by the pulse supervisor after observing outcomes, or manually with:
