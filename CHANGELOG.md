@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.548] - 2026-04-01
+
+### Fixed
+
+- normalize expired cooldowns in MJS inject functions (#15098)
+
 ## [3.5.547] - 2026-04-01
 
 ### Fixed
