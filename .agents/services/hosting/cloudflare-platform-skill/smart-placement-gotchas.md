@@ -1,72 +1,52 @@
 # Smart Placement Gotchas
 
-## "INSUFFICIENT_INVOCATIONS" Status
+## `INSUFFICIENT_INVOCATIONS` Status
 
-**Problem:** Not enough traffic for Smart Placement to analyze.
+Not enough traffic for Smart Placement to analyze.
 
-**Solutions:**
 - Ensure Worker receives consistent global traffic
-- Wait longer (analysis takes up to 15 minutes)
+- Wait up to 15 minutes (analysis time)
 - Send test traffic from multiple global locations
 - Check Worker has fetch event handler
 
-## Smart Placement Making Things Slower
+## Smart Placement Making Things Slower (`UNSUPPORTED_APPLICATION`)
 
-**Problem:** `placement_status: "UNSUPPORTED_APPLICATION"`
-
-**Likely Causes:**
-- Worker doesn't make backend calls (runs faster at edge)
-- Backend calls are cached (network latency to user more important)
+Worker doesn't benefit from Smart Placement when:
+- No backend calls (runs faster at edge)
+- Backend calls are cached (network latency to user dominates)
 - Backend service has poor global distribution
 
-**Solutions:**
-- Disable Smart Placement for this Worker
-- Review whether Worker actually benefits from Smart Placement
-- Consider caching strategy to reduce backend calls
+Disable Smart Placement for this Worker. Review caching strategy to reduce backend calls.
 
 ## No Request Duration Metrics
 
-**Problem:** Request duration chart not showing in dashboard.
+Dashboard chart not showing — check:
+- Smart Placement enabled in config
+- 15+ minutes elapsed since deployment
+- Sufficient traffic
+- `placement_status` is `SUCCESS`
 
-**Solutions:**
-- Ensure Smart Placement enabled in config
-- Wait 15+ minutes after deployment
-- Verify Worker has sufficient traffic
-- Check `placement_status` is `SUCCESS`
+## `cf-placement` Header Missing
 
-## cf-placement Header Missing
-
-**Problem:** Header not present in responses.
-
-**Possible Causes:**
 - Smart Placement not enabled
 - Beta feature removed (check latest docs)
-- Worker hasn't been analyzed yet
+- Worker not yet analyzed
 
 ## Monolithic Full-Stack Worker
 
-**Problem:** Frontend and backend logic in single Worker with Smart Placement enabled.
+Frontend + backend in a single Worker: Smart Placement optimizes for backend latency but hurts frontend response time.
 
-**Impact:** Smart Placement optimizes for backend latency but hurts frontend response time to users.
+Split into two Workers:
+- Frontend Worker (no Smart Placement) — runs at edge
+- Backend Worker (Smart Placement) — runs near database
 
-**Solution:** Split into two Workers:
-- Frontend Worker (no Smart Placement) - runs at edge
-- Backend Worker (Smart Placement) - runs near database
+## Local Development
 
-## Local Development Confusion
+Smart Placement only activates in production — not in `wrangler dev`. Test in staging: `wrangler deploy --env staging`
 
-**Issue:** Smart Placement doesn't work in `wrangler dev`.
+## Expected Behaviors (Not Bugs)
 
-**Explanation:** Smart Placement only activates in production deployments, not local development.
+- **1% baseline traffic**: Smart Placement routes 1% of requests without optimization for performance comparison.
+- **Analysis delay**: Up to 15 min after enabling. Worker runs at default edge location during analysis. Monitor `placement_status`.
 
-**Solution:** Test Smart Placement in staging environment: `wrangler deploy --env staging`
-
-## Baseline 1% Traffic
-
-Smart Placement routes 1% of requests without optimization for performance comparison. This is expected behavior — not a bug.
-
-## Analysis Time
-
-Up to 15 min after enabling. Worker runs at default edge location during analysis. Monitor `placement_status`.
-
-> **Note:** Requirements, eligibility criteria, and "when NOT to use" guidance are in [smart-placement.md](./smart-placement.md).
+> Requirements, eligibility criteria, and "when NOT to use" guidance: [smart-placement.md](./smart-placement.md)
