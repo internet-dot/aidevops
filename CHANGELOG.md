@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.546] - 2026-04-01
+
+### Fixed
+
+- detect and kill stalled workers on rate-limited providers (#15086)
+
 ## [3.5.545] - 2026-04-01
 
 ### Added
