@@ -58,6 +58,13 @@ When invoked without a complete program file:
 7. Models?
    → Researcher: [sonnet] / Evaluator: [haiku] / Target: [sonnet]
    → Only ask about Target if agent optimization detected
+
+8. Concurrency?
+   → Sequential [default] / Population-based (N hypotheses per iteration) / Multi-dimension
+   → If multi-dimension: "Which independent dimensions?" with file target split suggestion
+   → Default: sequential (safest, lowest cost)
+   → Suggest population-based if user mentions "fast" or "overnight"
+   → Suggest multi-dimension if multiple independent metrics detected
 ```
 
 ### Context detection logic
@@ -72,12 +79,26 @@ When invoked without a complete program file:
 | User says "prompt" | Suggest LLM-as-judge evaluation |
 | User says "performance" | Suggest hyperfine benchmarking |
 
+### Concurrency CLI flags
+
+```
+/autoresearch --population 4           # 4 hypotheses per iteration, keep best
+/autoresearch --dimensions "build-perf,test-speed,bundle-size"  # multi-dimension
+/autoresearch --concurrent 3           # shorthand: 3 sequential agents on different repos
+```
+
+For multi-dimension mode, the command must:
+1. Validate file targets don't overlap between dimensions (error if they do)
+2. Generate a shared convoy ID for mailbox grouping
+3. Dispatch each dimension as a separate subagent session with its own worktree
+4. Show a summary when all dimensions complete
+
 ### Output
 
 After interview, the command:
 1. Writes the research program to `todo/research/{name}.md`
 2. Confirms with user: "Research program ready. Begin now or queue for later?"
-3. If begin: dispatches to the autoresearch subagent
+3. If begin: dispatches to the autoresearch subagent (or multiple for multi-dimension)
 4. If queue: adds to TODO.md as a pending task
 
 Reference: `.agents/scripts/commands/full-loop.md` for command doc structure.
@@ -105,6 +126,14 @@ Reference: `.agents/scripts/commands/full-loop.md` for command doc structure.
     path: ".agents/scripts/commands/autoresearch.md"
   ```
 - [ ] Every interview question has a default value
+- [ ] Concurrency question (#8) offers sequential/population/multi-dimension with context-aware suggestion
+  ```yaml
+  verify:
+    method: codebase
+    pattern: "population|dimension|concurrent|sequential"
+    path: ".agents/scripts/commands/autoresearch.md"
+  ```
+- [ ] Multi-dimension mode validates non-overlapping file targets
 - [ ] Output writes a valid research program file per t1742 schema
 - [ ] YAML frontmatter in command doc follows conventions (description, agent, mode, model)
 - [ ] Lint clean (markdownlint)
@@ -120,6 +149,7 @@ Reference: `.agents/scripts/commands/full-loop.md` for command doc structure.
 - `.agents/scripts/commands/full-loop.md` — command doc pattern to follow
 - `.agents/scripts/commands/define.md` — interactive interview pattern (if exists)
 - `.agents/templates/research-program-template.md` — output format (t1742)
+- `.agents/scripts/mail-helper.sh` — mailbox system for multi-dimension convoy grouping
 
 ## Dependencies
 
@@ -134,4 +164,5 @@ Reference: `.agents/scripts/commands/full-loop.md` for command doc structure.
 | Context detection logic | 1h | Repo type detection, metric suggestions |
 | Interview flow | 1h | Questions, defaults, validation |
 | Init mode | 30m | Standalone repo scaffolding invocation |
-| **Total** | **~3h** | |
+| Concurrency interview + validation | 1h | Question #8, file overlap check, convoy ID |
+| **Total** | **~4h** | |

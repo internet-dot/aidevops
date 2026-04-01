@@ -6,15 +6,17 @@
 - **Session:** claude-code:interactive
 - **Created by:** marcusquinn (human) + AI (interactive)
 - **Parent task:** t1741
-- **Conversation context:** Discussed how Hyperspace AGI's cross-pollination (agents adopt peers' discoveries) maps to aidevops's cross-session memory. Each research session should start by recalling what worked before, and end by storing what was learned.
+- **Conversation context:** Discussed how Hyperspace AGI's cross-pollination (agents adopt peers' discoveries) maps to aidevops's cross-session memory and the existing SQLite mailbox system. Each research session should start by recalling what worked before and checking peer discoveries, and end by storing what was learned. Concurrent agents share findings in real-time via mailbox `discovery` messages grouped by `convoy` ID.
 
 ## What
 
-Implement structured experiment tracking (results.tsv) and cross-session memory integration so that:
+Implement structured experiment tracking (results.tsv), cross-session memory integration, and inter-agent discovery sharing so that:
 1. Every experiment is logged with its hypothesis, metric, and outcome
 2. Findings persist across sessions via the memory system
 3. Future research sessions start by recalling relevant prior findings
-4. Completion summaries are generated for PR bodies and human review
+4. Concurrent agents share discoveries in real-time via the mailbox system
+5. All discoveries from one research campaign are grouped by convoy ID for review
+6. Completion summaries are generated for PR bodies and human review
 
 ## Why
 
@@ -24,7 +26,11 @@ Without persistent tracking:
 - Humans can't review what was tried without reading git log
 - PR descriptions are generic instead of showing the research journey
 
-The Hyperspace model shows that cross-pollination (sharing discoveries between agents) accelerates convergence. In aidevops, cross-session memory is the single-user equivalent.
+The Hyperspace model shows that cross-pollination (sharing discoveries between agents) accelerates convergence. In aidevops, two mechanisms serve this:
+- **Cross-session memory** — findings persist between sessions (same role as Hyperspace's GitHub archive layer)
+- **Mailbox discoveries** — concurrent agents share findings in real-time (same role as Hyperspace's GossipSub layer)
+
+The mailbox system already has the right primitives: `discovery` message type, `convoy` thread grouping, agent registry. This task wires them into the autoresearch data flow.
 
 ## How (Approach)
 
@@ -75,6 +81,40 @@ autoresearch:{domain}:{repo}: {finding}
 - Why it worked/failed: {brief analysis}
 ```
 
+### Mailbox discovery integration
+
+For concurrent multi-dimension research, agents share findings via the mailbox:
+
+**Sending (after each keep/discard in the loop):**
+
+```bash
+mail-helper.sh send \
+  --to "broadcast" \
+  --type discovery \
+  --payload '{"campaign":"autoresearch-widget-2026-04-01","dimension":"build-perf","hypothesis":"removed lodash","status":"keep","metric_name":"build_time_s","metric_before":12.4,"metric_after":11.1,"metric_delta":-1.3,"files_changed":["src/utils/index.ts"],"iteration":5}' \
+  --convoy "autoresearch-widget-2026-04-01"
+```
+
+**Receiving (before each hypothesis generation):**
+
+```bash
+mail-helper.sh check --agent "autoresearch-{name}" --unread-only
+# Parse discovery payloads → add to hypothesis context
+mail-helper.sh read <message-id> --agent "autoresearch-{name}"
+```
+
+**Convoy review (after campaign completion):**
+
+```bash
+# All discoveries from one campaign, threaded
+sqlite3 ~/.aidevops/.agent-workspace/mail/mailbox.db \
+  "SELECT from_agent, payload FROM messages WHERE convoy='autoresearch-widget-2026-04-01' AND type='discovery' ORDER BY created_at"
+```
+
+The convoy groups all inter-agent messages from one research campaign for post-hoc review. Humans can see how agents influenced each other's hypotheses.
+
+**When no peers exist:** Mailbox calls are no-ops. `check` returns empty, `send` still stores the discovery (queryable later if another session starts on the same campaign). Memory storage happens regardless.
+
 ### Completion summary
 
 On loop exit, generate a summary for the PR body:
@@ -105,6 +145,23 @@ This summary goes into:
 1. The PR description (for human review)
 2. Cross-session memory (for future sessions)
 3. The research program file (appended as a `## History` section)
+4. Convoy thread in the mailbox (for multi-dimension campaign review)
+
+For multi-dimension campaigns, the orchestrator generates a **cross-dimension summary**:
+
+```markdown
+### Cross-Dimension Summary
+
+| Dimension | Baseline | Best | Delta | Iterations |
+|---|---|---|---|---|
+| build-perf | 12.4s | 9.2s | -26% | 28 |
+| test-speed | 45s | 31s | -31% | 22 |
+| bundle-size | 142KB | 98KB | -31% | 19 |
+
+### Cross-Pollination
+- build-perf removed lodash -> test-speed adopted via discovery (iteration 14)
+- bundle-size found tree-shaking barrel exports -> build-perf confirmed independently
+```
 
 ### Visualization (stretch goal)
 
@@ -146,6 +203,15 @@ Metric: build_time_s (lower = better)
 - [ ] Completion summary generated with key findings and failed hypotheses
 - [ ] Summary included in PR body
 - [ ] Token usage tracked per iteration
+- [ ] Mailbox discovery messages sent with correct convoy grouping
+  ```yaml
+  verify:
+    method: codebase
+    pattern: "convoy|discovery.*payload|mail-helper.*send"
+    path: ".agents/tools/autoresearch/"
+  ```
+- [ ] Cross-dimension summary generated for multi-dimension campaigns
+- [ ] Discovery payload includes: campaign, dimension, hypothesis, status, metric delta, files changed
 - [ ] Lint clean
 
 ## Context & Decisions
@@ -154,10 +220,14 @@ Metric: build_time_s (lower = better)
 - Memory per-experiment (not just per-session): individual findings are more useful than session summaries. "Removing barrel exports helped" is actionable; "session ran 28 experiments" is not.
 - Token tracking is approximate: exact token counting requires API response parsing which may not be available. Estimate from character count is acceptable.
 - Sparkline is stretch goal: useful for visual humans but not required for the core loop.
+- **Two-layer sharing**: mailbox for real-time inter-agent (concurrent peers), memory for cross-session (sequential sessions). Same discovery content format for both, different transport. This mirrors Hyperspace's GossipSub (real-time) + GitHub archive (durable) stack.
+- **Convoy as campaign thread**: all mailbox messages from one research campaign share a convoy ID. This makes post-hoc review trivial — query by convoy to see the full inter-agent conversation.
 
 ## Relevant Files
 
 - `~/.aidevops/.agent-workspace/memory/` — memory storage location
+- `~/.aidevops/.agent-workspace/mail/mailbox.db` — SQLite mailbox for inter-agent discoveries
+- `.agents/scripts/mail-helper.sh` — mailbox CLI (send, check, read, convoy query)
 - `.agents/tools/autoresearch/autoresearch.md` — subagent that calls these functions (t1744)
 - `.agents/reference/memory-lookup.md` — memory system reference
 
@@ -175,4 +245,6 @@ Metric: build_time_s (lower = better)
 | Memory integration | 30m | Store/recall format, domain tagging |
 | Summary generation | 30m | Template, key findings extraction |
 | Token tracking | 20m | Estimation method |
-| **Total** | **~2h** | |
+| Mailbox discovery format | 30m | Payload schema, convoy ID generation |
+| Cross-dimension summary | 30m | Aggregation across dimension agents |
+| **Total** | **~3h** | |

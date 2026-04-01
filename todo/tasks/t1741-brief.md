@@ -35,21 +35,58 @@ Direct ROI: agents optimized by autoresearch use fewer tokens for the same quali
 - "NEVER STOP" autonomous loop within time budget → budget-controlled loop
 
 **From hyperspaceai/agi:**
-- Cross-pollination (agents adopt peers' discoveries) → cross-session memory recall
+- Cross-pollination (agents adopt peers' discoveries) → mailbox `discovery` messages + cross-session memory
 - Multi-domain research (ML, search, finance, skills) → configurable research programs
-- 3-layer collaboration stack → memory (fast) + git (durable) + PR (human-readable)
+- 3-layer collaboration stack → mailbox (real-time, ~instant) + memory (cross-session) + git/PR (durable, human-readable)
+- Distributed concurrent agents → multi-dimension mode with non-overlapping file targets
 
 ### Architecture
 
 ```
 /autoresearch [args]
     ↓
-scripts/commands/autoresearch.md    # command doc (interactive setup)
+scripts/commands/autoresearch.md       # command doc (interactive setup, concurrency dispatch)
     ↓
-tools/autoresearch/autoresearch.md  # subagent (loop runner)
+tools/autoresearch/autoresearch.md     # subagent (loop runner)
     ↓
-templates/research-program-template.md  # program file format
+templates/research-program-template.md # program file format
+    ↓
+mail-helper.sh (mailbox)              # inter-agent discovery sharing (concurrent mode)
+memory-helper.sh (memory)             # cross-session finding persistence
 ```
+
+### Concurrency architecture
+
+Three concurrency modes, selected via interactive setup or CLI flags:
+
+```
+Sequential (default):
+  Single agent → single worktree → one hypothesis at a time
+
+Population-based (--population N):
+  Single agent → N temp worktree forks per iteration → measure in parallel → keep best
+  Internal parallelism, no inter-agent communication needed
+
+Multi-dimension (--dimensions "dim1,dim2,..."):
+  Orchestrator → N independent agents → N worktrees (non-overlapping files)
+  Inter-agent discovery via mailbox, grouped by convoy ID
+  
+  Orchestrator (command doc)
+  ├── Agent A: dim1 (worktree: experiment/{campaign}-dim1)
+  │   └── Sends/receives discoveries via mailbox
+  ├── Agent B: dim2 (worktree: experiment/{campaign}-dim2)
+  │   └── Sends/receives discoveries via mailbox
+  └── Agent C: dim3 (worktree: experiment/{campaign}-dim3)
+      └── Sends/receives discoveries via mailbox
+  
+  Convoy: "autoresearch-{campaign-id}" groups all messages
+```
+
+**Mailbox integration** uses existing `mail-helper.sh` primitives:
+- `register/deregister` — agent lifecycle
+- `send --type discovery --convoy {id}` — share findings with peers
+- `check --unread-only` — read peer discoveries before hypothesis generation
+- `convoy` field — groups all messages from one campaign for review
 
 ### Key files to create/modify
 
@@ -84,6 +121,7 @@ When invoked without complete args, the command asks for:
 3. What's the success metric? (with suggested metrics based on repo type)
 4. Budget? (with sensible defaults)
 5. Which models? (with tier recommendations)
+6. Concurrency? (sequential / population-based / multi-dimension)
 
 Each question includes a default that can be accepted with Enter.
 
@@ -127,6 +165,15 @@ Each question includes a default that can be accepted with Enter.
 - [ ] Results logged to results.tsv with structured format
 - [ ] Cross-session memory stores findings for future sessions
 - [ ] Standalone init runs `aidevops init` and registers in repos.json
+- [ ] Concurrent agents share discoveries via mailbox with convoy grouping
+  ```yaml
+  verify:
+    method: codebase
+    pattern: "mail-helper|discovery|convoy"
+    path: ".agents/tools/autoresearch/"
+  ```
+- [ ] Population-based mode generates N hypotheses and measures in parallel
+- [ ] Multi-dimension mode validates non-overlapping file targets across dimensions
 - [ ] Lint clean (shellcheck for any scripts, markdownlint for .md files)
 
 ## Context & Decisions
@@ -136,7 +183,9 @@ Each question includes a default that can be accepted with Enter.
 - **Binary keep/discard** (not gradual): Karpathy's key insight — if the metric improved, keep the commit; if not, revert. No partial credit. This keeps the loop simple and the git history clean.
 - **Token budget matters**: unlike Karpathy (GPU time is fixed cost), each autoresearch iteration costs API tokens. Total budget controls are essential, not optional.
 - **Agent optimization is the proof case**: all measurement infrastructure exists (agent-test-helper.sh). Build this integration first, generalize second.
-- **P2P/distributed features explicitly excluded**: Hyperspace's gossip, CRDT leaderboards, and points system are for multi-agent distributed research. aidevops is single-user; cross-session memory serves the same learning-persistence function without network infrastructure.
+- **Mailbox replaces P2P gossip**: Hyperspace uses libp2p GossipSub for real-time sharing. aidevops uses the existing SQLite mailbox (`mail-helper.sh`) with `discovery` message type and `convoy` thread grouping. Same semantics (share findings between concurrent agents), simpler transport (local filesystem vs P2P network).
+- **CRDT leaderboards and points system excluded**: these are incentive mechanisms for a distributed compute network. Single-user framework doesn't need them.
+- **Three concurrency modes with clear trade-offs**: sequential (simplest, lowest cost), population-based (internal parallelism, no inter-agent comms), multi-dimension (inter-agent via mailbox). Each has a clear use case — don't default to complexity.
 
 ## Relevant Files
 
@@ -145,6 +194,8 @@ Each question includes a default that can be accepted with Enter.
 - `.agents/scripts/commands/full-loop.md` — existing autonomous code work command (pattern to follow)
 - `.agents/configs/simplification-state.json` — hash registry for tracking what's changed
 - `.agents/templates/brief-template.md` — template format reference
+- `.agents/scripts/mail-helper.sh` — inter-agent mailbox (discovery, convoy, register/deregister)
+- `~/.aidevops/.agent-workspace/mail/mailbox.db` — SQLite mailbox (1700+ messages, mature)
 
 ## Dependencies
 
@@ -158,10 +209,10 @@ Each question includes a default that can be accepted with Enter.
 |-------|------|-------|
 | Research/read | 1h | Review agent-testing, full-loop, and simplification patterns |
 | t1742: Schema + template | 2h | Research program format definition |
-| t1743: Command doc | 3h | Interactive setup, context detection, 3 modes |
-| t1744: Subagent | 5h | Core loop, crash recovery, PR creation |
+| t1743: Command doc | 4h | Interactive setup, context detection, 3 modes, concurrency dispatch |
+| t1744: Subagent | 8h | Core loop, concurrency modes, mailbox integration, crash recovery |
 | t1745: Agent optimization | 3h | agent-test-helper integration, metrics |
 | t1746: Standalone init | 2h | Repo scaffolding, aidevops init, repos.json |
-| t1747: Results + memory | 2h | TSV logging, memory integration, summaries |
-| Testing | 2h | End-to-end validation of all modes |
-| **Total** | **~20h** | |
+| t1747: Results + memory | 3h | TSV logging, memory, mailbox discoveries, cross-dimension summaries |
+| Testing | 3h | End-to-end validation of all modes including concurrency |
+| **Total** | **~25h** | |
