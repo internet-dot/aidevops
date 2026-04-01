@@ -58,6 +58,8 @@ Tasks with no open blockers - ready to work on. Use `/ready` to refresh this lis
 <!--TOON:ready[0]{id,desc,owner,tags,est,logged}:
 -->
 
+- [ ] t1738 restructure: hexagonal.md simplification @marcusquinn #simplification-debt ~1h ref:GH#15078
+
 - [ ] t1729 simplification: tighten agent doc Model-Specific Subagents @marcusquinn #simplification-debt ~1h ref:GH#15020
 - [x] t1544 fix: setup script errors with Unknown MCP integration: context7 — setup script does not recognize context7 as a valid MCP integration despite documentation and subagent docs referencing it. Investigate mcp-setup.sh and migrations.sh for the integration registry and add context7. #bugfix #setup #mcp ~30m model:sonnet ref:GH#5248 logged:2026-03-19 pr:#5251 pr:#5251 completed:2026-03-19
 

@@ -2084,9 +2084,44 @@
       "pr": 12706
     },
     ".agents/tools/architecture/clean-ddd-hexagonal-skill/hexagonal.md": {
-      "hash": "cc7a9cfce528e2d77c1fe2c9b29e09442b5eaf25",
-      "at": "2026-03-30T06:49:15Z",
-      "pr": 13931
+      "hash": "81a0340b6952cd9e7ac91d17fe56e1beaabe741c",
+      "at": "2026-04-01T10:00:00Z",
+      "pr": 15078
+    },
+    ".agents/tools/architecture/clean-ddd-hexagonal-skill/hexagonal/01-introduction.md": {
+      "hash": "ed2e4d0e0715be8197715bbf6226572d74a77b79",
+      "at": "2026-04-01T10:00:00Z",
+      "pr": 15078
+    },
+    ".agents/tools/architecture/clean-ddd-hexagonal-skill/hexagonal/02-ports.md": {
+      "hash": "c2b7f80d0786e44fbda732fca3a3127aa8260da8",
+      "at": "2026-04-01T10:00:00Z",
+      "pr": 15078
+    },
+    ".agents/tools/architecture/clean-ddd-hexagonal-skill/hexagonal/03-adapters.md": {
+      "hash": "eab75a38abca400a683375a9b704ae22cff54342",
+      "at": "2026-04-01T10:00:00Z",
+      "pr": 15078
+    },
+    ".agents/tools/architecture/clean-ddd-hexagonal-skill/hexagonal/04-naming-conventions.md": {
+      "hash": "79be0f8f36336c51bcedffb2ae4ae81420c0a735",
+      "at": "2026-04-01T10:00:00Z",
+      "pr": 15078
+    },
+    ".agents/tools/architecture/clean-ddd-hexagonal-skill/hexagonal/05-project-structure.md": {
+      "hash": "5404d5b27b0796a0670e5724f27a7020dbd731e3",
+      "at": "2026-04-01T10:00:00Z",
+      "pr": 15078
+    },
+    ".agents/tools/architecture/clean-ddd-hexagonal-skill/hexagonal/06-configurability.md": {
+      "hash": "2432649b3e35064458417856462e8f8b04a776d5",
+      "at": "2026-04-01T10:00:00Z",
+      "pr": 15078
+    },
+    ".agents/tools/architecture/clean-ddd-hexagonal-skill/hexagonal/07-strong-vs-weak-ports.md": {
+      "hash": "56250a21b9ce4b86b88dacd52d358a26c6c32452",
+      "at": "2026-04-01T10:00:00Z",
+      "pr": 15078
     },
     ".agents/tools/deployment/cloudron-server-ops-skill.md": {
       "hash": "254ad33e9ddc52578f62584070efe94ef28a6860",
@@ -3427,6 +3462,11 @@
       "hash": "4111c2a2ec25f39fecd814fc065f58ac91c263b0",
       "at": "2026-04-01T00:00:00Z",
       "issue": 15113
+    },
+    ".agents/services/hosting/cloudflare-platform-skill/hyperdrive-patterns.md": {
+      "hash": "fd75a08e7897d3ea95b083de86964c919e81542d",
+      "at": "2026-04-01T19:30:00Z",
+      "pr": 15076
     }
   },
   ".agents/tools/mobile/app-dev-testing.md": {
