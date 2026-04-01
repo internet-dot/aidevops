@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.543] - 2026-04-01
+
+### Changed
+
+- Maintenance: bump version to 3.5.542
+- Maintenance: tighten content/editor.md agent doc (GH#14243) (#15064)
+
 ## [3.5.541] - 2026-04-01
 
 ### Changed
