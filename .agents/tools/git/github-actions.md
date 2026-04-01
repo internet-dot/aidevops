@@ -21,33 +21,15 @@ tools:
 - **Workflow**: `.github/workflows/code-quality.yml`
 - **Triggers**: push to `main`/`develop`; pull requests to `main`
 - **Jobs**: Framework Validation, SonarCloud Analysis, Codacy Analysis
-- **Secrets**: `SONAR_TOKEN` configured; `CODACY_API_TOKEN` still needed; `GITHUB_TOKEN` is auto-provided
-- **Dashboards**: SonarCloud https://sonarcloud.io/project/overview?id=marcusquinn_aidevops · Codacy https://app.codacy.com/gh/marcusquinn/aidevops · Actions https://github.com/marcusquinn/aidevops/actions
+- **Secrets**: `SONAR_TOKEN` configured; `CODACY_API_TOKEN` needs setup; `GITHUB_TOKEN` auto-provided
+- **Dashboards**: [SonarCloud](https://sonarcloud.io/project/overview?id=marcusquinn_aidevops) · [Codacy](https://app.codacy.com/gh/marcusquinn/aidevops) · [Actions](https://github.com/marcusquinn/aidevops/actions)
 - **Secret management**: Repository Settings → Secrets and variables → Actions
 
 <!-- AI-CONTEXT-END -->
 
-## Secrets
-
-| Secret | Status | Source |
-|--------|--------|--------|
-| `SONAR_TOKEN` | Configured | https://sonarcloud.io/account/security |
-| `CODACY_API_TOKEN` | Needs setup | https://app.codacy.com/account/api-tokens |
-| `GITHUB_TOKEN` | Auto-provided | GitHub |
-
-### Add `CODACY_API_TOKEN`
-
-1. Open https://github.com/marcusquinn/aidevops/settings/secrets/actions.
-2. Click **New repository secret**.
-3. Set **Name** to `CODACY_API_TOKEN` and **Value** to the token from secure local storage.
-
-## Workflow Behavior
-
-- Push to `main` or `develop` runs full analysis.
-- Pull requests to `main` run full analysis.
-- `Codacy Analysis` is conditional on the token being present.
-
 ## Concurrent Push Patterns
+
+Always `git pull --rebase` before `git push`. Keep `|| true` on pull so empty-repo/no-op failures don't abort. Exit non-zero after retries so the workflow surfaces push failures.
 
 | Scenario | Pattern |
 |----------|---------|
@@ -56,7 +38,7 @@ tools:
 | Wiki sync | Full retry |
 | Release workflows | Simple |
 
-### Full retry
+**Full retry** (external repos, wiki sync):
 
 ```yaml
 for i in 1 2 3; do
@@ -67,13 +49,25 @@ done
 exit 1
 ```
 
-### Simple
+**Simple** (auto-fix, release):
 
 ```yaml
 git pull --rebase origin main || true
 git push
 ```
 
-- Always `git pull --rebase` before `git push`.
-- Keep `|| true` on pull so empty-repo or no-op pull failures do not abort the workflow.
-- Exit non-zero after retries fail so the workflow surfaces the push problem.
+## Secrets
+
+| Secret | Status | Source |
+|--------|--------|--------|
+| `SONAR_TOKEN` | Configured | https://sonarcloud.io/account/security |
+| `CODACY_API_TOKEN` | Needs setup | https://app.codacy.com/account/api-tokens |
+| `GITHUB_TOKEN` | Auto-provided | GitHub |
+
+**Add `CODACY_API_TOKEN`:** Settings → Secrets and variables → Actions → New repository secret → Name: `CODACY_API_TOKEN`, Value: token from secure local storage.
+
+## Workflow Behavior
+
+- Push to `main` or `develop` → full analysis.
+- Pull requests to `main` → full analysis.
+- `Codacy Analysis` conditional on token presence.
