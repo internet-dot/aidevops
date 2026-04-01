@@ -2,8 +2,8 @@
   "_comment": null,
   "files": {
     ".agents/aidevops/agent-sources.md": {
-      "hash": "86113ed3f6cb39ad363af10d420942cff1af592c",
-      "at": "2026-03-31T05:32:40Z",
+      "hash": "695919792e265692b40f1924ed84656e53509c96",
+      "at": "2026-03-31T21:31:56Z",
       "pr": 14645
     },
     ".agents/reference/define-probes/feature.md": {
@@ -21,9 +21,9 @@
       "pr": 11021
     },
     ".agents/tools/credentials/psst.md": {
-      "hash": "cbb2379680b3ce35dc2b7ba4e2be3efe46c509c6",
-      "at": "2026-03-31T06:15:51Z",
-      "pr": 14687
+      "hash": "73a231518b35816ca652d0a2aa130a21dd2b8f1d",
+      "at": "2026-03-31T21:31:27Z",
+      "pr": 14789
     },
     ".agents/marketing-sales/meta-ads-creative-hooks.md": {
       "hash": "f7c8e3356361a9ab1941f729337bbf7d0f8447ef",
@@ -136,8 +136,8 @@
       "pr": 11276
     },
     ".agents/tools/build-mcp/aidevops-plugin.md": {
-      "hash": "c2af34ac248062f83be58abf2e85fabd6e424710",
-      "at": "2026-03-31T09:13:36Z",
+      "hash": "ca3a6834542e7578a2590795bdec0f6dd63b30f3",
+      "at": "2026-03-31T21:31:34Z",
       "pr": 14775
     },
     ".agents/aidevops/add-new-mcp-to-aidevops.md": {
@@ -1086,8 +1086,8 @@
       "pr": 14484
     },
     ".agents/scripts/commands/postflight-loop.md": {
-      "hash": "c78f879537d08532f631523c4021e7ebc9f462ff",
-      "at": "2026-03-31T14:55:57Z",
+      "hash": "37a467bf622640eb6c8d75aa2c1de45c9a27c61c",
+      "at": "2026-03-31T21:30:52Z",
       "pr": 14942
     },
     ".agents/scripts/commands/routine.md": {
@@ -1496,9 +1496,9 @@
       "pr": 12145
     },
     ".agents/scripts/pulse-wrapper.sh": {
-      "hash": "3fceee99ce88bbc7e2a79dd591483b383ea98805",
-      "at": "2026-03-29T16:31:29Z",
-      "pr": 13117
+      "hash": "17c1d423856a0d7e58fe5d0f201ec112d78815dc",
+      "at": "2026-03-31T21:31:15Z",
+      "pr": 14846
     },
     ".agents/tools/browser/stagehand-python.md": {
       "hash": "2a7d864c02279238b1f773c390f7ffe011c6f9d6",
@@ -1781,8 +1781,8 @@
       "pr": 15014
     },
     ".agents/services/hosting/cloudflare-platform-skill/workers.md": {
-      "hash": "12b23db6429e9400868f947faff09d534d18165d",
-      "at": "2026-03-31T09:29:58Z",
+      "hash": "27842bda8a80f5fb937401fe5224129d2405ad97",
+      "at": "2026-03-31T21:31:31Z",
       "pr": 14792
     },
     ".agents/tools/git/gitlab-cli.md": {
@@ -3165,9 +3165,9 @@
       "pr": 14701
     },
     ".agents/tools/vision/overview.md": {
-      "hash": "03b9c9b416982c3a220eb0d47da8a08882cb4a97",
-      "at": "2026-03-31T13:32:37Z",
-      "pr": 14726
+      "hash": "5abddf3f89fc529bd3119b8ae147961451728199",
+      "at": "2026-03-31T21:30:59Z",
+      "pr": 14932
     },
     ".agents/seo/geo-strategy.md": {
       "hash": "9e140122413dbbd69a12a6c545c7df84b07f448a",
@@ -3180,19 +3180,119 @@
       "pr": 14867
     },
     ".agents/tools/video/remotion-transitions.md": {
-      "hash": "7123b1f29ba3cba9eedf7f7f19f04c561c73a353",
-      "at": "2026-03-31T12:08:05Z",
+      "hash": "f643aa12a96105bd68286a55958c88444a7d235e",
+      "at": "2026-03-31T21:31:09Z",
       "pr": 14883
     },
     ".agents/scripts/commands/security-deps.md": {
-      "hash": "fbaf83d04fce904137096c772adb42790e04badb",
-      "at": "2026-03-31T14:03:00Z",
+      "hash": "837b301fe989e4eae715b71ed8150d1bfe207b7f",
+      "at": "2026-03-31T21:30:54Z",
       "pr": 14941
     },
     ".agents/services/hosting/cloudflare-platform-skill/network-interconnect.md": {
-      "hash": "867372b20ef0d4adf0cbefddf0d59533f2ef5a1b",
-      "at": "2026-03-31T13:06:56Z",
+      "hash": "a87bdad3db117a280177a98592d12acba7a2e676",
+      "at": "2026-03-31T21:31:02Z",
       "pr": 14916
+    },
+    ".agents/prompts/worker-efficiency-protocol.md": {
+      "hash": "56bf2446a17ed8c7a0bc4905633a63ac0a3971b8",
+      "at": "2026-03-31T21:30:55Z",
+      "pr": 14943
+    },
+    ".agents/scripts/commands/venv-health.md": {
+      "hash": "bbcc15a86e165230f04159f127a8dc6a52160b30",
+      "at": "2026-03-31T21:30:56Z",
+      "pr": 14968
+    },
+    ".agents/seo/ai-search-kpi-template.md": {
+      "hash": "b750815aa689ad99b32c355078ef3d168b489789",
+      "at": "2026-03-31T21:30:58Z",
+      "pr": 14969
+    },
+    ".agents/tools/ai-assistants/models-sonnet.md": {
+      "hash": "035dfbf3d02fc552dd1f4dab55ea1bf70331e2b1",
+      "at": "2026-03-31T21:31:01Z",
+      "pr": 14913
+    },
+    ".agents/tools/video/remotion-timing.md": {
+      "hash": "6213ebf1e87a77cab44febc35ec0a3b10fd2db4c",
+      "at": "2026-03-31T21:31:07Z",
+      "pr": 14881
+    },
+    ".agents/services/monitoring/socket.md": {
+      "hash": "34908f8a4d31f318c2c7e65f73f7277106d3c6d3",
+      "at": "2026-03-31T21:31:11Z",
+      "pr": 14882
+    },
+    ".agents/scripts/commands/security-history.md": {
+      "hash": "7164de660f471db3fdf292f714218cf6b86a7c92",
+      "at": "2026-03-31T21:31:21Z",
+      "pr": 14830
+    },
+    ".agents/tools/ai-assistants/datasets.md": {
+      "hash": "0f7c114820d1dbf1f373c459eb8a466f0c8930cc",
+      "at": "2026-03-31T21:31:24Z",
+      "pr": 14819
+    },
+    ".agents/scripts/commands/seo-opportunities.md": {
+      "hash": "ecaa059027c5abc7b2cc9a036a8de4d517bdad47",
+      "at": "2026-03-31T21:31:28Z",
+      "pr": 14788
+    },
+    ".agents/services/hosting/cloudflare-platform-skill/d1.md": {
+      "hash": "df1066f54a7932adfdb616417fa87d69e18fb5eb",
+      "at": "2026-03-31T21:31:30Z",
+      "pr": 14791
+    },
+    ".agents/product/monetisation.md": {
+      "hash": "55189a900356aa78d56d99f057d1454ad886b179",
+      "at": "2026-03-31T21:31:44Z",
+      "pr": 14758
+    },
+    ".agents/workflows/branch/chore.md": {
+      "hash": "ecb2cc634d7b0a4b43d719ac663aafd4ee7bd89e",
+      "at": "2026-03-31T21:31:45Z",
+      "pr": 14755
+    },
+    ".agents/scripts/commands/email-health-check.md": {
+      "hash": "23288e5d9e78e9d350c5ca69277fa00fe5a3153e",
+      "at": "2026-03-31T21:31:49Z",
+      "pr": 14681
+    },
+    ".agents/workflows/branch.md": {
+      "hash": "eb176fb714ca17efe9ea0f58e2a6b87d591e5ecb",
+      "at": "2026-03-31T21:31:54Z",
+      "pr": 14921
+    },
+    ".agents/marketing-sales/direct-response-copy-frameworks-landing-page-structure.md": {
+      "hash": "f6caa2244bb5170ee50dbcb0f268cd42a12b40a8",
+      "at": "2026-03-31T22:11:36Z",
+      "pr": 14853
+    },
+    ".agents/tools/code-review/skill-scanner.md": {
+      "hash": "44610d12c6666e506e869c5c40b7cb1b0e8c19b3",
+      "at": "2026-03-31T22:11:43Z",
+      "pr": 14837
+    },
+    ".agents/workflows/pre-edit.md": {
+      "hash": "4dce8edfb8fde958c599b565e92b8d910a77e848",
+      "at": "2026-03-31T22:11:44Z",
+      "pr": 14839
+    },
+    ".agents/scripts/commands/youtube-script.md": {
+      "hash": "90f828282be8300a6b1dd012f0b53eafbf4a9049",
+      "at": "2026-03-31T22:11:52Z",
+      "pr": 14805
+    },
+    ".agents/tools/browser/playwright.md": {
+      "hash": "620cb00e7a1706e11f0e03d66a2aac7a9fd6947e",
+      "at": "2026-03-31T22:11:59Z",
+      "pr": 14790
+    },
+    ".agents/services/hosting/cloudflare-platform-skill/workers-gotchas.md": {
+      "hash": "090f4a4d018d8f3fa89861f9d254a6ae60098706",
+      "at": "2026-03-31T22:12:11Z",
+      "pr": 15014
     }
   }
 }
