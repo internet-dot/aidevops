@@ -35,7 +35,11 @@ Bundles increase AOV 15–35% (one payment event, perceived value asymmetry, cho
 
 +5% retention = +25–95% profit (Bain). Expansion 3–5× cheaper than acquisition. Checkout optimization: see Chapter 18 §18.3.
 
-**Cancellation flow:** Required reason → friction + product data · Match save offer to reason ("Too expensive" → discount/downgrade; "Not using" → tips; "Missing feature" → roadmap) · Pause option (1–3 months) saves 15–25% of churners · Downgrade path: $10/mo >> $0
+**Cancellation flow:**
+- Required reason → friction + product data
+- Match save offer to reason: "Too expensive" → discount/downgrade; "Not using" → tips; "Missing feature" → roadmap
+- Pause option (1–3 months) saves 15–25% of churners
+- Downgrade path: $10/mo >> $0
 
 **Dunning** (involuntary churn = 20–40% of SaaS churn; recovers 30–50%):
 
@@ -48,7 +52,10 @@ Bundles increase AOV 15–35% (one payment event, perceived value asymmetry, cho
 | Grace period | 7–14 days before service interruption |
 | Post-pause | Win-back email with easy reactivation |
 
-**Expansion triggers:** Upgrade prompts at 80% limit (test 70/80/90%), frame as growth not restriction · Gate scale-valuable features (analytics, automation, team); test tier placement · Annual conversion at 3 months active, milestones, renewal — annual churn ~half of monthly
+**Expansion triggers:**
+- Upgrade prompts at 80% limit (test 70/80/90%); frame as growth not restriction
+- Gate scale-valuable features (analytics, automation, team); test tier placement
+- Annual conversion at 3 months active, milestones, renewal — annual churn ~half of monthly
 
 ## 25.4 Monetization Experimentation
 
@@ -93,13 +100,13 @@ Recovery sequence: 1h pre-filled cart → 24h FAQ+testimonials → 72h 10% disco
 
 ## 25.6 Monetization CRO Checklist
 
-**Pre-launch:** Define primary metric (RPV/ARPU/LTV) + guardrails (CR, churn, NPS) · Calculate MDE + sample size · Document full journey impact · Set up cohort-level revenue tracking · Confirm legal compliance · Brief support · Establish rollback criteria
+**Pre-launch:** Define primary metric (RPV/ARPU/LTV) + guardrails (CR, churn, NPS) | Calculate MDE + sample size | Document full journey impact | Set up cohort-level revenue tracking | Confirm legal compliance | Brief support | Establish rollback criteria
 
-**During:** Monitor daily revenue + conversion · Track pricing-related tickets · Watch segment effects (new/returning, mobile/desktop, geo) · Verify allocation balance
+**During:** Monitor daily revenue + conversion | Track pricing-related tickets | Watch segment effects (new/returning, mobile/desktop, geo) | Verify allocation balance
 
-**Post-test:** Statistical significance on revenue (not just CR) · Project 12-month LTV using cohort curves · Analyze qualitative signals · Document learnings · Update roadmap · Archive results
+**Post-test:** Statistical significance on revenue (not just CR) | Project 12-month LTV using cohort curves | Analyze qualitative signals | Document learnings | Update roadmap | Archive results
 
-**Ongoing cadence:** Monthly: RPV vs benchmarks · Quarterly: competitive analysis + ≥1 experiment · Semi-annually: WTP survey · Annually: pricing update · Seasonally (e-com): recalibrate bundles
+**Ongoing cadence:** Monthly: RPV vs benchmarks | Quarterly: competitive analysis + ≥1 experiment | Semi-annually: WTP survey | Annually: pricing update | Seasonally (e-com): recalibrate bundles
 
 ### Revenue Optimization Maturity Model
 
