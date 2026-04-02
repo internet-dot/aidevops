@@ -2037,9 +2037,9 @@
       "pr": 12706
     },
     ".agents/tools/architecture/clean-ddd-hexagonal-skill/hexagonal.md": {
-      "hash": "cc7a9cfce528e2d77c1fe2c9b29e09442b5eaf25",
-      "at": "2026-03-30T06:49:15Z",
-      "pr": 13931
+      "hash": "41d8f6e04b9e57cdc21f03ba2a4d1c8a79076022",
+      "at": "2026-04-02T07:15:00Z",
+      "pr": 15078
     },
     ".agents/tools/deployment/cloudron-server-ops-skill.md": {
       "hash": "ef42b29c1fcb28a5de1fb8be65f21496d5ef10cf",
