@@ -126,12 +126,12 @@ _apply_label() {
 	fi
 
 	if [[ "$item_type" == "pr" ]]; then
-		gh pr edit "$number" --repo "$repo" --add-label "$label" 2>/dev/null || {
+		gh pr edit "$number" --repo "$repo" --add-label "$label" >/dev/null 2>&1 || {
 			_log "WARN: failed to label PR #${number}"
 			return 1
 		}
 	else
-		gh issue edit "$number" --repo "$repo" --add-label "$label" 2>/dev/null || {
+		gh issue edit "$number" --repo "$repo" --add-label "$label" >/dev/null 2>&1 || {
 			_log "WARN: failed to label issue #${number}"
 			return 1
 		}
