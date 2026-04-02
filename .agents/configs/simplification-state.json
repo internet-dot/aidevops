@@ -337,9 +337,9 @@
       "pr": 13425
     },
     ".agents/content/platform-personas.md": {
-      "at": "2026-03-28T20:16:53Z",
-      "hash": "b0c32995086af230ae41412dd2dca98054968ce2",
-      "passes": 1,
+      "at": "2026-04-02T21:19:52Z",
+      "hash": "b7e19c96eda87359699f528e35bddce57b0ddc2d",
+      "passes": 2,
       "pr": 12167
     },
     ".agents/content/production-audio.md": {
@@ -739,10 +739,10 @@
       "pr": 15220
     },
     ".agents/marketing-sales/cro-chapter-19.md": {
-      "at": "2026-04-02T20:51:07Z",
-      "hash": "57c88fea52a008b1e08e1e4427f363ea9a9ddbdc56e86c36655bf8da7fd59f3e",
+      "at": "2026-04-02T21:19:54Z",
+      "hash": "347272e46c7d04f05dd13a4683cf44bef0dd3da7",
       "issue": "GH#14286",
-      "passes": 1,
+      "passes": 2,
       "note": "Reference corpus chapter tightened: 92 → 90 lines. Removed decorative closing sentence with no information value. Zero content loss."
     },
     ".agents/marketing-sales/cro-chapter-20.md": {
@@ -1654,9 +1654,9 @@
       "pr": 11350
     },
     ".agents/seo/programmatic-seo.md": {
-      "at": "2026-03-29T21:43:09Z",
-      "hash": "246454e374da68bf1dcec5b59e732fac3841e7dd",
-      "passes": 1,
+      "at": "2026-04-02T21:20:03Z",
+      "hash": "cc9aa2cac637f165854122e6b4328e70a7ee3850",
+      "passes": 2,
       "pr": 13301
     },
     ".agents/seo/semrush.md": {
@@ -2357,9 +2357,9 @@
       "pr": 13564
     },
     ".agents/services/hosting/cloudflare-platform-skill/stream-gotchas.md": {
-      "at": "2026-03-29T22:09:43Z",
-      "hash": "1e5cf033ce0af2ba18bc9e38ca48bd69cf3455bc",
-      "passes": 1,
+      "at": "2026-04-02T21:20:07Z",
+      "hash": "925bb48a1a5651aca456c9232bf0d79ed9c2bce4",
+      "passes": 2,
       "pr": 13254
     },
     ".agents/services/hosting/cloudflare-platform-skill/stream-patterns.md": {
@@ -4379,15 +4379,15 @@
       "pr": 15490
     },
     "aidevops.sh": {
-      "at": "2026-04-02T20:39:42Z",
-      "hash": "37721a79c00af5e7561f0ae0493a2bc0c5bfcb1f",
-      "passes": 10,
+      "at": "2026-04-02T21:20:21Z",
+      "hash": "90040f0123e17ec55230dcec870b2644f51ab883",
+      "passes": 11,
       "pr": 15470
     },
     "setup.sh": {
-      "at": "2026-04-02T20:39:42Z",
-      "hash": "5b72ef3dab8318c5ea0ed032676ac1ddd4859dc6",
-      "passes": 10,
+      "at": "2026-04-02T21:20:21Z",
+      "hash": "26c165d4ff7b5dea246a1adcc57a0b7a5ce417d8",
+      "passes": 11,
       "pr": 15470
     },
     "todo/tasks/GH#15363-brief.md": {
@@ -4451,16 +4451,16 @@
       "pr": 15470
     },
     ".agents/aidevops/api-integrations.md": {
-      "hash": "b846f1a8ef5bc661dde4fced618c9a7fe5d76db6ab487eff7f231258cab764e8",
-      "at": "2026-04-02T00:00:00Z",
+      "hash": "9ed830efd42c0b7901229915ff9fe70d6f50fdac",
+      "at": "2026-04-02T21:19:50Z",
       "pr": 0,
-      "passes": 1
+      "passes": 2
     },
     ".agents/seo/seo-audit-skill/aeo-geo-patterns.md": {
-      "hash": "66f82e3082e12432782da9a151756ad89125ec656763ee2f494bf8a6dce8c28d",
-      "at": "2026-04-02T00:00:00Z",
+      "hash": "2238ceff37db82a81a9939c6d2217c5b7659a551",
+      "at": "2026-04-02T21:20:03Z",
       "pr": 0,
-      "passes": 1
+      "passes": 2
     },
     ".agents/services/database/postgres-drizzle-skill/cheatsheet-schema.md": {
       "hash": "1aa15519d959c89c0e09c3e30ac0210d6da35134",
@@ -4469,40 +4469,40 @@
       "passes": 1
     },
     ".agents/services/hosting/cloudflare-platform-skill/agents-sdk-patterns.md": {
-      "hash": "3b5aad8cadb464560c0bee6e9adeee54110b13f223f7cb19b1a1bb872c28caab",
-      "at": "2026-04-02T00:00:00Z",
+      "hash": "b253668b96ea394b289fba6ee03f12b30a041540",
+      "at": "2026-04-02T21:20:06Z",
       "pr": 0,
-      "passes": 1
+      "passes": 2
     },
     ".agents/services/hosting/cloudflare-platform-skill/cron-triggers-gotchas.md": {
-      "hash": "e3e34c32d8a2ae9da4da7a0b66ffd1f38255ec8d2ae2aef281c6e9d8eec8fa89",
-      "at": "2026-04-02T00:00:00Z",
+      "hash": "d154add5508b3d7224a50183ea1f9828083b64cf",
+      "at": "2026-04-02T21:20:06Z",
       "pr": 15606,
-      "passes": 1
+      "passes": 2
     },
     ".agents/services/hosting/cloudflare-platform-skill/ddos-gotchas.md": {
-      "hash": "d226f42b982f0a9ef82204b118405cf7b01eb0360905feacaec8b2bca9b946ba",
-      "at": "2026-04-02T00:00:00Z",
+      "hash": "f9bc5ae56912b9413ffb35a31dfdca00d42513cb",
+      "at": "2026-04-02T21:20:06Z",
       "pr": 0,
-      "passes": 1
+      "passes": 2
     },
     ".agents/services/hosting/cloudflare-platform-skill/zaraz.md": {
-      "hash": "abcd8c44ae2709e94448fc7186503c5e84adbf4b249090c3144acc78e73482f4",
-      "at": "2026-04-02T00:00:00Z",
+      "hash": "e4b79af78576116b33c9947649dffa9f1de19cec",
+      "at": "2026-04-02T21:20:08Z",
       "pr": 0,
-      "passes": 1
+      "passes": 2
     },
     ".agents/tools/code-review/auditing.md": {
-      "hash": "b7c346582edd627a9ab4f70a7c7e4b8f8d97be32231069f4e10126d2db94062d",
-      "at": "2026-04-02T00:00:00Z",
+      "hash": "aa7f70c05362b5b00887a152a101c0b6ee7da926",
+      "at": "2026-04-02T21:20:13Z",
       "pr": 0,
-      "passes": 1
+      "passes": 2
     },
     ".agents/tools/context/rapidfuzz.md": {
-      "hash": "f06e2a2bf6fc561deeaff84f8ec5389eb942307d89902687e82d9c4c31e1c9cf",
-      "at": "2026-04-02T00:00:00Z",
+      "hash": "aa9697dab445dd988e21cf2cd29a5065bd821808",
+      "at": "2026-04-02T21:20:14Z",
       "pr": 0,
-      "passes": 1
+      "passes": 2
     },
     ".agents/tools/deployment/cloudron-app-packaging-skill/manifest-ref.md": {
       "hash": "edecc25afbace885cab2eac01e07629d890a4fad",
@@ -4511,10 +4511,10 @@
       "passes": 1
     },
     ".agents/workflows/branch/experiment.md": {
-      "hash": "3a37ba8edc24966b9bc8ee7dd979c7349d455abec0dd31d72cd78b30f4e58c6d",
-      "at": "2026-04-02T00:00:00Z",
+      "hash": "c0b292cdf26b8a6a6cbdff05b765a4601adaf875",
+      "at": "2026-04-02T21:20:20Z",
       "pr": 0,
-      "passes": 1
+      "passes": 2
     }
   }
 }
