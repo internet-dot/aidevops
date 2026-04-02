@@ -53,3 +53,9 @@ The current document is 80 lines and contains verbose prose. Simplifying it redu
 | Implementation | 15m | Tighten prose and restructure |
 | Testing | 5m | Markdown lint and manual review |
 | **Total** | **25m** | |
+
+## Dependencies
+
+- **Blocked by:** Human review (GitHub branch protection policy)
+- **Blocks:** GH#15433
+- **External:** None
