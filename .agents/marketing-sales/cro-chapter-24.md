@@ -2,9 +2,9 @@
 
 ## 24.1 Building a CRO Culture
 
-**Organizational mindset shift:** Move from opinion-based to evidence-based decisions — testing as default, learning from failures, continuous improvement. Cross-functional collaboration requires marketing-product alignment, shared KPIs, regular experiment reviews, and knowledge sharing.
+**Organizational mindset shift:** Move from opinion-based to evidence-based decisions — testing as default, learning from failures, continuous improvement. Cross-functional collaboration requires marketing-product alignment, shared KPIs, regular experiment reviews, and knowledge sharing across teams.
 
-**Executive buy-in:** Build the business case with ROI calculations, competitive analysis, risk mitigation framing, and growth projections. Sustain it with experiment showcases, revenue impact reporting, customer insight sharing, and strategic recommendations tied to business outcomes.
+**Executive buy-in:** Build the business case with ROI calculations, competitive analysis, risk mitigation framing, and growth enablement projections. Sustain it with regular experiment showcases, revenue impact reporting, customer insight sharing, and strategic recommendations tied to business outcomes.
 
 ## 24.2 Advanced Analytics Techniques
 
