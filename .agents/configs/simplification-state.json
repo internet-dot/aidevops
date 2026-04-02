@@ -1465,9 +1465,9 @@
       "pr": 12346
     },
     ".agents/scripts/framework-issue-helper.sh": {
-      "at": "2026-03-29T00:24:21Z",
-      "hash": "a53fde8f11aabd50fbda03386f967721d987e07a",
-      "passes": 1,
+      "at": "2026-04-02T15:26:33Z",
+      "hash": "64247677d8764e3ba8355385495671181569267a",
+      "passes": 2,
       "pr": 12145
     },
     ".agents/scripts/gh-signature-helper.sh": {
@@ -1495,15 +1495,15 @@
       "pr": 15455
     },
     ".agents/scripts/pulse-wrapper.sh": {
-      "at": "2026-04-02T14:41:08Z",
-      "hash": "89769d3ef61d5620080a1785841aa3534fbee7ee",
-      "passes": 3,
+      "at": "2026-04-02T15:26:35Z",
+      "hash": "d9d1b3c9f9c1f2d79821f1bf5cb2dd0aae2dd7c5",
+      "passes": 4,
       "pr": 15086
     },
     ".agents/scripts/stats-functions.sh": {
-      "at": "2026-03-28T02:51:08Z",
-      "hash": "ae9524512d52a766184fe33343be188294776d96",
-      "passes": 2,
+      "at": "2026-04-02T15:26:35Z",
+      "hash": "0b35007b637df39cef11c21d1fe03bcee36a7d6f",
+      "passes": 3,
       "pr": 11273
     },
     ".agents/scripts/tests/test-gh-signature-helper.sh": {
@@ -3895,9 +3895,9 @@
       "pr": 12526
     },
     ".agents/tools/ui/ai-chat-sidebar.md": {
-      "at": "2026-03-30T06:49:20Z",
-      "hash": "bb322008ec31a4bc681407654ac87a2426c055fc",
-      "passes": 2,
+      "at": "2026-04-02T15:28:13Z",
+      "hash": "fc9db0532fa56a02b82ccc7692d25933098eb6d4",
+      "passes": 3,
       "pr": 13958
     },
     ".agents/tools/ui/frontend-debugging.md": {
@@ -4351,15 +4351,15 @@
       "pr": 15490
     },
     "aidevops.sh": {
-      "at": "2026-04-02T14:42:58Z",
-      "hash": "8ce36be4bf00889f6759998366350978384af48a",
-      "passes": 4,
+      "at": "2026-04-02T15:28:23Z",
+      "hash": "c300e2efe49b0dc67ce744ecddf07426df95c58f",
+      "passes": 5,
       "pr": 15470
     },
     "setup.sh": {
-      "at": "2026-04-02T14:42:58Z",
-      "hash": "e8d6100de484897cbff3373eaf33207a83226c5c",
-      "passes": 4,
+      "at": "2026-04-02T15:28:23Z",
+      "hash": "de7198a1b06dc1e03af305b2dd5d0161d986fd42",
+      "passes": 5,
       "pr": 15470
     },
     "todo/tasks/GH#15363-brief.md": {
@@ -4423,10 +4423,10 @@
       "pr": 15470
     },
     ".agents/services/hosting/cloudflare-platform-skill/r2-gotchas.md": {
-      "hash": "15664c439e4f42388852766e353f09c3d2ff0773405f329109ce47c293e3aff1",
-      "at": "2026-04-02T14:18:00Z",
+      "hash": "c4d5ed8a074df52b72e94f16782306bf95098b3b",
+      "at": "2026-04-02T15:27:02Z",
       "pr": 15629,
-      "passes": 1
+      "passes": 2
     },
     ".agents/services/hosting/cloudflare-platform-skill/realtimekit-gotchas.md": {
       "at": "2026-04-02T15:00:00Z",
