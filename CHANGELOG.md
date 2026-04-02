@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.693] - 2026-04-02
+
+### Changed
+
+- Tightened github-actions.md agent doc (79→69 lines) — removed redundant Workflow Behavior section, condensed CODACY_API_TOKEN setup steps (#15899)
+
 ## [3.5.636] - 2026-04-02
 
 ### Fixed
