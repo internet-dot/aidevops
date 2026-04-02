@@ -4410,5 +4410,10 @@
     "hash": "03478debc956ad02835cde5c946e89762351c2c00c836d8c9c24fca3ebd366cc",
     "status": "simplified",
     "issue": "GH#14993"
+  },
+  ".agents/tools/browser/crawl4ai-usage.md": {
+    "hash": "06d74378b2525d6d5d6d1c53ddf83aff9ffd5edc68ac9210351cb232a13bb1b3",
+    "status": "simplified",
+    "issue": "GH#14108"
   }
 }

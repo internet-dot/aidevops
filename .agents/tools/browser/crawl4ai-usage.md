@@ -22,7 +22,7 @@ tools:
 - **Crawl**: `./crawl4ai-helper.sh crawl URL markdown output.json`
 - **Extract**: `./crawl4ai-helper.sh extract URL '{"title":"h1"}' data.json`
 - **MCP Tools**: `crawl_url | crawl_multiple | extract_structured | take_screenshot | generate_pdf`
-- **Output**: JSON with markdown, html, extracted_content, links, media, metadata
+- **Output fields**: `markdown`, `html`, `extracted_content`, `links`, `media`, `metadata`
 - **Config template**: `configs/crawl4ai-config.json.txt`
 - **MCP template**: `configs/mcp-templates/crawl4ai-mcp-config.json`
 - **Integration guide**: `.agents/tools/browser/crawl4ai-integration.md`
@@ -30,19 +30,18 @@ tools:
 
 ## Setup
 
-\`\`\`bash
+```bash
 ./.agents/scripts/crawl4ai-helper.sh install
 ./.agents/scripts/crawl4ai-helper.sh docker-setup
 ./.agents/scripts/crawl4ai-helper.sh docker-start
 ./.agents/scripts/crawl4ai-helper.sh mcp-setup   # MCP server for AI assistants
-\`\`\`
+```
 
 ## Core Operations
 
-\`\`\`bash
+```bash
 # Crawl (markdown or html)
 ./.agents/scripts/crawl4ai-helper.sh crawl https://example.com markdown output.json
-./.agents/scripts/crawl4ai-helper.sh crawl https://example.com html output.json
 
 # Extract with CSS selectors
 ./.agents/scripts/crawl4ai-helper.sh extract https://example.com '{"title":"h1","content":".article"}' data.json
@@ -64,62 +63,46 @@ for url in "${urls[@]}"; do
     ./.agents/scripts/crawl4ai-helper.sh crawl "$url" markdown "output-$(date +%s).json"
     sleep 2
 done
-\`\`\`
 
-## AI Assistant Integration
-
-### MCP (Claude Desktop)
-
-\`\`\`json
-{
-  "mcpServers": {
-    "crawl4ai": {
-      "command": "npx",
-      "args": ["crawl4ai-mcp-server@latest"]
-    }
-  }
-}
-\`\`\`
-
-### REST API (other assistants)
-
-\`\`\`python
-import requests
-response = requests.post("http://localhost:11235/crawl", json={
-    "urls": ["https://example.com"],
-    "crawler_config": {
-        "type": "CrawlerRunConfig",
-        "params": {"cache_mode": "bypass"}
-    }
-})
-\`\`\`
+# Crawl → PDF via pandoc (pandoc-helper.sh requires a real file path, not stdin)
+./.agents/scripts/crawl4ai-helper.sh crawl https://docs.com markdown docs.json
+jq -r '.results[0].markdown' docs.json > /tmp/docs-crawl.md
+./.agents/scripts/pandoc-helper.sh convert /tmp/docs-crawl.md pdf docs.pdf
+```
 
 ## Output Processing
 
-\`\`\`json
-{
-  "success": true,
-  "results": [{
-    "url": "https://example.com",
-    "markdown": "# Page Title\n\nContent...",
-    "html": "<html>...</html>",
-    "extracted_content": {},
-    "links": {},
-    "media": {},
-    "metadata": {}
-  }]
-}
-\`\`\`
-
-\`\`\`bash
+```bash
 jq -r '.results[0].markdown' output.json > content.md
 jq '.results[0].extracted_content' output.json > data.json
 jq -r '.results[0].links.internal[]' output.json
-\`\`\`
+```
+
+## AI Assistant Integration
+
+**MCP (Claude Desktop)** — config template at `configs/mcp-templates/crawl4ai-mcp-config.json`:
+
+```json
+{
+  "mcpServers": {
+    "crawl4ai": { "command": "npx", "args": ["crawl4ai-mcp-server@latest"] }
+  }
+}
+```
+
+**REST API (other assistants)**:
+
+```python
+import requests
+response = requests.post("http://localhost:11235/crawl", json={
+    "urls": ["https://example.com"],
+    "crawler_config": {"type": "CrawlerRunConfig", "params": {"cache_mode": "bypass"}}
+})
+```
 
 ## Configuration
 
-\`\`\`bash
+```bash
 # Performance (high-volume)
 export CRAWL4AI_CONCURRENT_REQUESTS=5
 export CRAWL4AI_BROWSER_POOL_SIZE=3
@@ -129,39 +112,29 @@ export CRAWL4AI_MEMORY_THRESHOLD=90
 export LLM_PROVIDER=openai/gpt-4o-mini
 export CRAWL4AI_MAX_PAGES=50
 export CRAWL4AI_TIMEOUT=60
-\`\`\`
+```
 
 ## Security
 
-- robots.txt respected by default
-- Built-in rate limiting and timeout protection
+- robots.txt respected by default; built-in rate limiting and timeout protection
 - User agent identifies as Crawl4AI
 - Clear cache: `docker exec crawl4ai redis-cli FLUSHALL`
 - **Never write API keys to files** — use `aidevops secret set OPENAI_API_KEY`
 
 ## Monitoring & Debugging
 
-\`\`\`bash
+```bash
 ./.agents/scripts/crawl4ai-helper.sh status
-docker ps | grep crawl4ai
+docker logs crawl4ai --tail 50
 curl -s http://localhost:11235/health | jq '.'
 
-docker logs crawl4ai --tail 50
+# Restart
 ./.agents/scripts/crawl4ai-helper.sh docker-stop && ./.agents/scripts/crawl4ai-helper.sh docker-start
 
 # Smoke test
 curl -X POST http://localhost:11235/crawl \
   -H "Content-Type: application/json" \
   -d '{"urls": ["https://httpbin.org/html"]}'
-\`\`\`
+```
 
 Endpoints: `/dashboard` | `/playground` | `/schema` | `/metrics`
-
-## Integration
-
-\`\`\`bash
-# Crawl → PDF via pandoc (write to temp file; pandoc-helper.sh requires a real file path)
-./.agents/scripts/crawl4ai-helper.sh crawl https://docs.com markdown docs.json
-jq -r '.results[0].markdown' docs.json > /tmp/docs-crawl.md
-./.agents/scripts/pandoc-helper.sh convert /tmp/docs-crawl.md pdf docs.pdf
-\`\`\`
