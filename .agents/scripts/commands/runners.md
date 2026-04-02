@@ -4,89 +4,46 @@ agent: Build+
 mode: subagent
 ---
 
-Dispatch one or more workers. Route by work type:
-
-- **Code changes** (repo edits, tests, PRs) -> `/full-loop`
-- **Operational work** (reports, audits, monitoring, outreach) -> direct command execution
+Dispatch workers by type: **Code changes** (repo edits, tests, PRs) -> `/full-loop`; **Operational work** (reports, audits) -> direct command.
 
 Arguments: $ARGUMENTS
 
-## Scope
+## Scope & Rules
 
-**`/runners` is a targeted dispatcher, not a supervisor.** It resolves explicit items, launches one worker per item, shows the dispatch table, and stops. It does NOT run supervisor phases, auto-pickup, stale recovery, or audits. Use `/pulse` for unattended slot-filling (`scripts/commands/pulse.md`).
+**`/runners` is a targeted dispatcher, not a supervisor.** It resolves items, launches workers, and stops. It does NOT run supervisor phases or auto-pickup. Use `/pulse` for unattended slot-filling.
 
-Workers stay isolated: `/runners` never touches source code, tests, branches, or merge conflicts. If a worker fails, fix the worker prompt or workflow, not the dispatcher.
-
-## Input Types
-
-| Pattern | Type | Example |
-|---------|------|---------|
-| `GH#\d+` | GitHub issue/PR numbers | `/runners GH#267 GH#268` |
-| `t\d+` | Task IDs from TODO.md | `/runners t083 t084 t085` |
-| `#\d+` or PR URL | PR numbers | `/runners #382 #383` |
-| Issue URL | GitHub issue | `/runners https://github.com/user/repo/issues/42` |
-| Free text | Description | `/runners "Fix the login bug"` |
+- **Isolation**: Workers stay isolated; `/runners` never touches source code or branches.
+- **Dispatch Path**: `headless-runtime-helper.sh run` is the **ONLY** valid path. NEVER use bare `opencode run` (GH#5096).
+- **Detach**: Use `--detach` for agent-to-agent dispatch to avoid blocking.
+- **Directory**: `--dir ~/Git/<repo-name>` must match the target repo.
+- **Agent**: Omit `--agent` for code tasks (Build+ default).
+- **Model**: Do NOT add `--model` unless escalation is required by policy.
 
 ## Step 1: Resolve Items
 
-Resolve each input to a description:
-
-```bash
-gh issue view 267 --repo <slug> --json number,title,url
-gh pr view 268 --repo <slug> --json number,title,headRefName,url
-grep -E "^- \[ \] t083 " TODO.md
-gh issue view 42 --repo user/repo --json number,title,url
-```
+Resolve inputs to descriptions:
+- `GH#\d+` / `Issue URL`: `gh issue view <id> --json number,title,url`
+- `t\d+`: `grep -E "^- \[ \] <id> " TODO.md`
+- `#\d+` / `PR URL`: `gh pr view <id> --json number,title,headRefName,url`
 
 ## Step 2: Dispatch Workers
 
-Launch each worker via `headless-runtime-helper.sh run` — the **ONLY** valid dispatch path. It builds the lifecycle prompt, handles provider rotation, preserves sessions, and applies backoff. NEVER use bare `opencode run` or workers may stop after PR creation (GH#5096).
-
-Use the `--detach` flag to self-daemonize the worker and return control to the calling agent immediately. This is the preferred pattern for agent-to-agent dispatch.
-
 ```bash
-AGENTS_DIR="$(aidevops config get paths.agents_dir)"
-HELPER="${AGENTS_DIR/#\~/$HOME}/scripts/headless-runtime-helper.sh"
+HELPER="$(aidevops config get paths.agents_dir)/scripts/headless-runtime-helper.sh"
 
-# Code task (Build+ is default; omit --agent)
-$HELPER run \
-  --detach \
-  --role worker \
-  --session-key "task-t083" \
-  --dir ~/Git/<repo> \
-  --title "t083: <description>" \
-  --prompt "/full-loop t083 -- <description>"
-# Returns immediately with: "Dispatched PID: 12345"
+# Code task (Build+ default)
+$HELPER run --detach --role worker --session-key "task-t083" \
+  --dir ~/Git/<repo> --title "t083: <desc>" --prompt "/full-loop t083 -- <desc>"
 ```
 
-### Manual Redirection (Legacy)
+### Legacy Redirection (no --detach)
 
-If using an older version of `aidevops` without `--detach`, redirect at the caller level to avoid blocking the interactive session:
-
-```bash
-$HELPER run ... </dev/null >>/tmp/worker-${session_key}.log 2>&1 &
-sleep 2
-```
-
-### Dispatch Rules
-
-- `--dir ~/Git/<repo-name>` must match the target repo
-- `--agent <name>` routes to a specialist; omit it for code tasks (Build+ default)
-- `/full-loop` only for tasks needing repo code changes and PR traceability
-- `--detach` is recommended for agent-to-agent dispatch to avoid blocking
-- Do NOT add `--model` unless escalation is required by workflow policy
+`$HELPER run ... </dev/null >>/tmp/worker-${key}.log 2>&1 &`
 
 ## Step 3: Show Dispatch Table
 
-After dispatch, show what was launched:
-
-```text
-## Dispatched Workers
+Show launched items then stop:
 
 | # | Item | Worker |
 |---|------|--------|
-| 1 | GH#267: <title> | dispatched |
-| 2 | GH#268: <title> | dispatched |
-```
-
-Then stop. `/pulse` or a later operator action handles follow-up.
+| 1 | GH#267: `<title>` | dispatched |
