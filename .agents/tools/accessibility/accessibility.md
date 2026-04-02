@@ -58,7 +58,6 @@ export WAVE_API_KEY="your-key"     # or env var
 ### accessibility-helper.sh
 
 ```bash
-# Full audit (Lighthouse + pa11y, desktop and mobile)
 accessibility-helper.sh audit https://example.com
 
 # Lighthouse — score, failed audits, ARIA validation
@@ -82,8 +81,7 @@ accessibility-helper.sh wave-credits                     # check remaining credi
 # Contrast ratio — AA normal (4.5:1), AA large (3:1), AAA normal (7:1), AAA large (4.5:1)
 accessibility-helper.sh contrast '#333333' '#ffffff'
 
-# Playwright contrast — headless DOM traversal, computed fg/bg, font size/weight,
-# WCAG ratio per element, SC 1.4.3/1.4.6, large text (≥18pt or ≥14pt bold),
+# Playwright contrast — DOM traversal, computed fg/bg, SC 1.4.3/1.4.6, large text (≥18pt/≥14pt bold),
 # gradient/image background flags. Exit: 0=pass, 1=failures, 2=error.
 accessibility-helper.sh playwright-contrast https://example.com           # summary
 accessibility-helper.sh playwright-contrast https://example.com json      # JSON
