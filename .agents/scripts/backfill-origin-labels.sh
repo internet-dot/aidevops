@@ -102,11 +102,23 @@ _match_worker_title() {
 
 _match_body_session_type() {
 	local body="$1"
+	# Match structured header: "session-type: routine/headless"
 	if echo "$body" | grep -qiE 'session-type:\s*(routine|headless)'; then
 		echo "worker"
 		return 0
 	fi
 	if echo "$body" | grep -qiE 'session-type:\s*interactive'; then
+		echo "interactive"
+		return 0
+	fi
+	# Match natural-language signature footer from gh-signature-helper.sh:
+	#   "...as a headless bash routine" / "...as a headless worker session"
+	#   "...with the user in an interactive session"
+	if echo "$body" | grep -qiE 'as a headless (bash routine|worker session)'; then
+		echo "worker"
+		return 0
+	fi
+	if echo "$body" | grep -qiE 'with the user in an interactive session'; then
 		echo "interactive"
 		return 0
 	fi
