@@ -3,7 +3,7 @@
     "hash": "b7c346582edd627a9ab4f70a7c7e4b8f8d97be32231069f4e10126d2db94062d",
     "issue": "GH#15647",
     "status": "simplified",
-    "note": "Instruction doc tightened: 103 \u2192 90 lines. Merged config code blocks, moved URLs inline, compressed CI/CD prose. Zero content loss."
+    "note": "Instruction doc tightened: 103 → 90 lines. Merged config code blocks, moved URLs inline, compressed CI/CD prose. Zero content loss."
   },
   ".agents/seo/ai-search-kpi-template.md": {
     "hash": "03478debc956ad02835cde5c946e89762351c2c00c836d8c9c24fca3ebd366cc",
@@ -819,10 +819,12 @@
       "pr": 12753
     },
     ".agents/marketing-sales/direct-response-copy-swipe-file-landing-pages.md": {
-      "hash": "08f939130363372a3f8667c083bb0d46e0cfed5b619406b76d42730490934237",
+      "hash": "e32cc9a38c9f2b1305595ef393fa64650ed7f0b5",
       "issue": "GH#15068",
       "note": "Reference corpus already split into 5 chapter files (01-saas-examples.md through 05-guarantees-and-design-principles.md). Index is 30 lines; chapters total 163 lines. No further action needed.",
-      "status": "done"
+      "status": "done",
+      "at": "2026-04-02T20:39:23Z",
+      "passes": 1
     },
     ".agents/marketing-sales/direct-response-copy-checklists-pre-publish.md": {
       "at": "2026-04-01T20:59:28Z",
@@ -3340,9 +3342,9 @@
       "pr": 11570
     },
     ".agents/tools/deployment/cloudron-app-packaging-skill.md": {
-      "at": "2026-04-01T20:59:51Z",
-      "hash": "0895bca6f21b082551b21fa7765569599eb36e95",
-      "passes": 1,
+      "at": "2026-04-02T20:39:36Z",
+      "hash": "b0b18eb482f60246c0d1961494667f4f06c3a711",
+      "passes": 2,
       "pr": 14880
     },
     ".agents/tools/deployment/cloudron-app-packaging-skill/addons-ref.md": {
@@ -4420,15 +4422,15 @@
       "pr": 15490
     },
     "aidevops.sh": {
-      "at": "2026-04-02T20:04:40Z",
-      "hash": "2d6b5db517e305a957a0a62ecc4fc106f0bb1ae5",
-      "passes": 9,
+      "at": "2026-04-02T20:39:42Z",
+      "hash": "37721a79c00af5e7561f0ae0493a2bc0c5bfcb1f",
+      "passes": 10,
       "pr": 15470
     },
     "setup.sh": {
-      "at": "2026-04-02T20:04:40Z",
-      "hash": "0a0228e27dd9cafbe664a595a321dccf119f27ee",
-      "passes": 9,
+      "at": "2026-04-02T20:39:42Z",
+      "hash": "5b72ef3dab8318c5ea0ed032676ac1ddd4859dc6",
+      "passes": 10,
       "pr": 15470
     },
     "todo/tasks/GH#15363-brief.md": {
@@ -4504,12 +4506,5 @@
     "issue": "GH#14091",
     "status": "simplified",
     "note": "Consolidated 4 fragmented fuzz.* code blocks into 1 cohesive block. 121 -> 104 lines. All content preserved."
-  },
-  ".agents/tools/context/openapi-search.md": {
-    "hash": "f473e91d5fc0f3a6b0f72c294761cc4902de15e1796343de11449b10bb8ee235",
-    "issue": "GH#14263",
-    "status": "simplified",
-    "lines_before": 96,
-    "lines_after": 85
   }
 }
