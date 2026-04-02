@@ -2909,9 +2909,9 @@
       "pr": 13942
     },
     ".agents/tools/browser/crawl4ai-integration.md": {
-      "at": "2026-04-02T04:56:58Z",
-      "hash": "5b8849f598a7c31bff13579aedda9586682f6ad7",
-      "passes": 1,
+      "at": "2026-04-02T19:17:13Z",
+      "hash": "6839d1c4bd81f04a3f75f075d43d233cbebfdb3e",
+      "passes": 2,
       "pr": 15463
     },
     ".agents/tools/browser/crawl4ai-resources.md": {
@@ -4391,15 +4391,15 @@
       "pr": 15490
     },
     "aidevops.sh": {
-      "at": "2026-04-02T18:47:47Z",
-      "hash": "ba951be512cfe279ef9483aae9d1c40c479d840e",
-      "passes": 7,
+      "at": "2026-04-02T19:17:21Z",
+      "hash": "7c14cd10aec3076a6fb9c7b2a8c1ea89cd9fa303",
+      "passes": 8,
       "pr": 15470
     },
     "setup.sh": {
-      "at": "2026-04-02T18:47:47Z",
-      "hash": "909439baa3022c2f265edc7b6a89a05d79aeda1b",
-      "passes": 7,
+      "at": "2026-04-02T19:17:21Z",
+      "hash": "a744403db493e925abb400b995ad7dbce23b9800",
+      "passes": 8,
       "pr": 15470
     },
     "todo/tasks/GH#15363-brief.md": {
