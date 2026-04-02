@@ -2407,9 +2407,9 @@
       "pr": 13101
     },
     ".agents/services/communications/google-chat.md": {
-      "hash": "af2981e3fd22fa349f051dda8a12615f9fd5d65d",
-      "at": "2026-03-30T03:33:48Z",
-      "pr": 13658
+      "hash": "ccd9445f3c9b4fdfc555df7ce819d2bed289f1a785afb68d5debf020a1ecb614",
+      "at": "2026-04-02T19:30:00Z",
+      "pr": 15793
     },
     ".agents/tools/deployment/fly-io.md": {
       "hash": "31560e6a9e3aec1733571093c7cc53dd5f530e94",
