@@ -8421,6 +8421,7 @@ dispatch_triage_reviews() {
 
 	[[ "$available" =~ ^[0-9]+$ ]] || available=0
 	[[ "$available" -gt 0 ]] || {
+		echo "[pulse-wrapper] dispatch_triage_reviews: no available worker slots" >>"$WRAPPER_LOGFILE"
 		printf '%d\n' "$available"
 		return 0
 	}
@@ -8428,7 +8429,7 @@ dispatch_triage_reviews() {
 	# Parse needs-review items from pre-fetched state
 	local state_file="${STATE_FILE:-}"
 	[[ -f "$state_file" ]] || {
-		echo "[pulse-wrapper] dispatch_triage_reviews: no state file" >>"$LOGFILE"
+		echo "[pulse-wrapper] dispatch_triage_reviews: no state file" >>"$WRAPPER_LOGFILE"
 		printf '%d\n' "$available"
 		return 0
 	}
@@ -8441,7 +8442,7 @@ dispatch_triage_reviews() {
 		resolved_model=$(~/.aidevops/agents/scripts/model-availability-helper.sh resolve sonnet 2>/dev/null || echo "")
 	fi
 	if [[ -z "$resolved_model" ]]; then
-		echo "[pulse-wrapper] dispatch_triage_reviews: model resolution failed (opus and sonnet unavailable)" >>"$LOGFILE"
+		echo "[pulse-wrapper] dispatch_triage_reviews: model resolution failed (opus and sonnet unavailable)" >>"$WRAPPER_LOGFILE"
 	fi
 
 	# Parse markdown-format state entries:
@@ -8470,9 +8471,9 @@ dispatch_triage_reviews() {
 	local candidate_count
 	candidate_count=$(printf '%s' "$candidates" | grep -c '[^[:space:]]' 2>/dev/null || echo 0)
 	if [[ -n "$candidates" ]]; then
-		echo "[pulse-wrapper] dispatch_triage_reviews: parsed ${candidate_count} candidates from state file" >>"$LOGFILE"
+		echo "[pulse-wrapper] dispatch_triage_reviews: parsed ${candidate_count} candidates from state file" >>"$WRAPPER_LOGFILE"
 	else
-		echo "[pulse-wrapper] dispatch_triage_reviews: 0 candidates found in state file" >>"$LOGFILE"
+		echo "[pulse-wrapper] dispatch_triage_reviews: 0 candidates found in state file" >>"$WRAPPER_LOGFILE"
 		printf '%d\n' "$available"
 		return 0
 	fi
@@ -8503,7 +8504,7 @@ dispatch_triage_reviews() {
 		available=$((available - 1))
 	done <<<"$candidates"
 
-	echo "[pulse-wrapper] dispatch_triage_reviews: dispatched ${triage_count} triage workers (${available} slots remaining)" >>"$LOGFILE"
+	echo "[pulse-wrapper] dispatch_triage_reviews: dispatched ${triage_count} triage workers (${available} slots remaining)" >>"$WRAPPER_LOGFILE"
 	printf '%d\n' "$available"
 	return 0
 }
