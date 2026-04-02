@@ -28,6 +28,24 @@ tools:
 
 <!-- AI-CONTEXT-END -->
 
+## Documentation Standards
+
+- **Content**: Cover core features, working examples, security, troubleshooting, and AI patterns.
+- **Quality**: Clear technical language, consistent formatting, syntax-highlighted code, cross-references.
+- **Accuracy**: Keep commands accurate, examples sanitized, API details current; include version notes.
+- **Maintenance**: Update on API changes, new features, or security advisories. Verify examples work.
+
+## Standard Guide Structure
+
+- `# [Service Name] Guide`
+- `## Provider Overview` — service type, strengths, API support, use cases
+- `## Configuration`
+- `## Usage Examples`
+- `## Security Best Practices`
+- `## Troubleshooting`
+- `## MCP Integration` / `## AI Assistant Integration`
+- `## Best Practices`
+
 ## Service Guide Categories
 
 | Category | Guides |
@@ -40,41 +58,17 @@ tools:
 | Development & Local | localhost.md, localwp-mcp.md, mcp-servers.md, context7-mcp-setup.md |
 | Framework | recommendations-opinionated.md, cloudflare-setup.md, coolify-setup.md |
 
-## Standard Guide Structure
-
-- `# [Service Name] Guide`
-- `## Provider Overview` — service type, strengths, API support, use cases
-- `## Configuration`
-- `## Usage Examples`
-- `## Security Best Practices`
-- `## Troubleshooting`
-- `## MCP Integration` / `## AI Assistant Integration` when relevant
-- `## Best Practices`
-
-## Documentation Standards
-
-- Cover core features, working examples, security concerns, troubleshooting, and AI integration patterns
-- Clear technical language, consistent formatting, syntax-highlighted code, cross-references
-- Keep commands accurate, examples sanitized, API details current; version notes when they matter
-
-## Maintenance
-
-- Update on API changes, new features, security advisories
-- Verify commands and examples work; keep structure consistent across guides
-
 ## Cross-Service Workflows
 
-**Domain → DNS → Hosting:** Domain purchasing (Spaceship/101domains) → DNS (Cloudflare/Route53) → Hosting (Hetzner/Hostinger)
+- **Domain → DNS → Hosting**: Domain purchasing (Spaceship/101domains) → DNS (Cloudflare/Route53) → Hosting (Hetzner/Hostinger)
+- **Dev → Quality → Deploy**: Git platforms (GitHub/GitLab) → Code auditing (CodeRabbit/SonarCloud) → Deployment (Coolify/hosting)
+- **Security → Credentials → Monitoring**: Vaultwarden (credentials) → Email monitoring (SES) → Security auditing
 
-**Development → Quality → Deployment:** Git platforms (GitHub/GitLab) → Code auditing (CodeRabbit/SonarCloud) → Deployment (Coolify/hosting)
+## Navigation & Priority
 
-**Security → Credentials → Monitoring:** Vaultwarden (credentials) → Email monitoring (SES) → Security auditing
-
-## Navigation
-
-- Service-specific: `.agents/[service-name].md`
-- Framework context: `.agents/AGENTS.md`
-- Provider selection: `.agents/recommendations-opinionated.md`
-- Setup procedures: `.agents/[service]-setup.md`
+- **Service-specific**: `.agents/[service-name].md`
+- **Framework context**: `.agents/AGENTS.md`
+- **Provider selection**: `.agents/recommendations-opinionated.md`
+- **Setup procedures**: `.agents/[service]-setup.md`
 
 **Priority**: service guide → framework context → best-practices guide → setup guide → Context7 MCP for latest external docs.
