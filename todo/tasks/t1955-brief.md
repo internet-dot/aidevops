@@ -1,7 +1,7 @@
 ---
 mode: subagent
 ---
-# t1852: simplification: tighten agent doc Documentation AI Context (.agents/aidevops/docs.md)
+# t1955: simplification: tighten agent doc Documentation AI Context (.agents/aidevops/docs.md)
 
 ## Origin
 

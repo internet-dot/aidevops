@@ -4,7 +4,7 @@ agent: Build+
 mode: subagent
 ---
 
-Dispatch workers by type: **Code changes** (repo edits, tests, PRs) -> `/full-loop`; **Operational work** (reports, audits) -> direct command.
+Dispatch workers by type: **Code changes** (repo edits, tests, PRs) -> `/full-loop`; **Operational work** (reports, audits) -> direct `/command` invocation (not bare `opencode run`).
 
 Arguments: $ARGUMENTS
 
@@ -39,7 +39,13 @@ $HELPER run --detach --role worker --session-key "task-t083" \
 
 ### Legacy Redirection (no --detach)
 
-`$HELPER run ... </dev/null >>/tmp/worker-${session_key}.log 2>&1 &`
+```bash
+SESSION_KEY="task-t083"
+LOG_DIR="$HOME/.aidevops/.agent-workspace/tmp"
+mkdir -p "$LOG_DIR"
+$HELPER run --role worker --session-key "$SESSION_KEY" ... \
+  </dev/null >>"$LOG_DIR/worker-${SESSION_KEY}.log" 2>&1 &
+```
 
 ## Step 3: Show Dispatch Table
 
