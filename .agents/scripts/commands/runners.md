@@ -29,7 +29,8 @@ Resolve inputs to descriptions:
 ## Step 2: Dispatch Workers
 
 ```bash
-HELPER="$(aidevops config get paths.agents_dir)/scripts/headless-runtime-helper.sh"
+AGENTS_DIR="$(aidevops config get paths.agents_dir)"
+HELPER="${AGENTS_DIR/#\~/$HOME}/scripts/headless-runtime-helper.sh"
 
 # Code task (Build+ default)
 $HELPER run --detach --role worker --session-key "task-t083" \
@@ -38,7 +39,7 @@ $HELPER run --detach --role worker --session-key "task-t083" \
 
 ### Legacy Redirection (no --detach)
 
-`$HELPER run ... </dev/null >>/tmp/worker-${key}.log 2>&1 &`
+`$HELPER run ... </dev/null >>/tmp/worker-${session_key}.log 2>&1 &`
 
 ## Step 3: Show Dispatch Table
 
