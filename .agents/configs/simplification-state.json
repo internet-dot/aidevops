@@ -4504,5 +4504,10 @@
     "issue": "GH#14091",
     "status": "simplified",
     "note": "Consolidated 4 fragmented fuzz.* code blocks into 1 cohesive block. 121 -> 104 lines. All content preserved."
+  },
+  ".agents/tools/video/remotion-display-captions.md": {
+    "hash": "310c035b5a283b7d2998bcfc657d3d425840ca2aedeb0a4c3651eacc7c0aafd3",
+    "simplified": true,
+    "lines": 121
   }
 }

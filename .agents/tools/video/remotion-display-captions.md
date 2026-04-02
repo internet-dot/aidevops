@@ -10,27 +10,24 @@ metadata:
 
 Display `Caption[]` data with TikTok-style pages and per-word highlighting.
 
-## Install `@remotion/captions`
+## Install
 
 ```bash
-npx remotion add @remotion/captions # If project uses npm
-bunx remotion add @remotion/captions # If project uses bun
-yarn remotion add @remotion/captions # If project uses yarn
-pnpm exec remotion add @remotion/captions # If project uses pnpm
+npx remotion add @remotion/captions  # npm
+bunx remotion add @remotion/captions  # bun
+yarn remotion add @remotion/captions  # yarn
+pnpm exec remotion add @remotion/captions  # pnpm
 ```
 
 ## 1. Group captions into pages
 
-Use `createTikTokStyleCaptions()` to batch words into timed pages. `combineTokensWithinMilliseconds` controls how many words appear at once.
+`createTikTokStyleCaptions()` batches words into timed pages. `combineTokensWithinMilliseconds` controls words per page (higher = more words, lower = word-by-word).
 
 ```tsx
 import {useMemo} from 'react';
 import {createTikTokStyleCaptions} from '@remotion/captions';
 import type {Caption} from '@remotion/captions';
 
-// How often captions should switch (in milliseconds)
-// Higher values = more words per page
-// Lower values = fewer words (more word-by-word)
 const SWITCH_CAPTIONS_EVERY_MS = 1200;
 
 const CaptionedContent: React.FC<{captions: Caption[]}> = ({captions}) => {
@@ -45,7 +42,7 @@ const CaptionedContent: React.FC<{captions: Caption[]}> = ({captions}) => {
 
 ## 2. Render each page in a `<Sequence>`
 
-Map over `pages` and derive each sequence from the page timing.
+Map over `pages` and derive each sequence from page timing.
 
 ```tsx
 import {Sequence, useVideoConfig, AbsoluteFill} from 'remotion';
@@ -86,7 +83,7 @@ const CaptionedContent: React.FC<{pages: TikTokPage[]}> = ({pages}) => {
 
 ## 3. Highlight the active word
 
-Each page exposes `tokens`, so you can compare the current playback time against `fromMs` and `toMs`.
+Each page exposes `tokens` with `fromMs`/`toMs` — compare against current playback time.
 
 ```tsx
 import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
