@@ -4689,6 +4689,12 @@
       "at": "2026-04-02T22:44:04Z",
       "pr": 15665,
       "passes": 1
+    },
+    ".agents/reference/platform-support.md": {
+      "hash": "67f8c07f2072f5b15ffae32c07a9e8930a5f7c49",
+      "at": "2026-04-03T00:48:09Z",
+      "pr": "GH#16007",
+      "passes": 1
     }
   },
   ".agents/tools/ai-assistants/models-sonnet.md": {
