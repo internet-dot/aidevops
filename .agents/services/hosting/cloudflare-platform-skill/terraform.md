@@ -32,18 +32,6 @@ provider "cloudflare" {
 2. **Global API Key** (legacy): `api_key` + `api_email` / `CLOUDFLARE_API_KEY` + `CLOUDFLARE_EMAIL` — less secure
 3. **User Service Key**: `user_service_key` — Origin CA certificates only
 
-### Remote State Backend
-
-```hcl
-terraform {
-  backend "s3" {
-    bucket = "terraform-state"
-    key    = "cloudflare/terraform.tfstate"
-    region = "us-east-1"
-  }
-}
-```
-
 ## Common Commands
 
 ```bash
