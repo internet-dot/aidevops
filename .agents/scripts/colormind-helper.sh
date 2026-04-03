@@ -212,6 +212,95 @@ except Exception as e:
 	return 0
 }
 
+# Build Colormind API input array from a lock spec string
+# Usage: _build_colormind_input <lock_spec>
+# Outputs the JSON input array string to stdout
+_build_colormind_input() {
+	local lock_spec="$1"
+	local arr_items=()
+	local parts p rgb
+
+	if [[ -z "$lock_spec" ]]; then
+		echo "[\"N\",\"N\",\"N\",\"N\",\"N\"]"
+		return 0
+	fi
+
+	if [[ "$lock_spec" != *","* ]]; then
+		# Single hex: lock position 1 (darkest)
+		rgb=$(hex_to_rgb "$lock_spec")
+		printf '[%s,"N","N","N","N"]' "$rgb"
+		return 0
+	fi
+
+	# Comma-separated: parse each position
+	IFS=',' read -ra parts <<<"$lock_spec"
+	if [[ ${#parts[@]} -gt 5 ]]; then
+		print_error "Lock spec has ${#parts[@]} positions; maximum is 5 (got: $lock_spec)"
+		return 1
+	fi
+	for p in "${parts[@]}"; do
+		p="$(echo "$p" | xargs)" # trim whitespace
+		if [[ "$p" == "N" || "$p" == "n" ]]; then
+			arr_items+=("\"N\"")
+		else
+			arr_items+=("$(hex_to_rgb "$p")")
+		fi
+	done
+	# Pad to 5 items
+	while [[ ${#arr_items[@]} -lt 5 ]]; do
+		arr_items+=("\"N\"")
+	done
+	printf '[%s]' "$(IFS=, && echo "${arr_items[*]}")"
+	return 0
+}
+
+# Output palette as JSON object
+# Usage: _output_palette_json <colour_arr[@]>
+_output_palette_json() {
+	local -a colour_arr=("$@")
+	local i role comma
+
+	echo "{"
+	for i in "${!colour_arr[@]}"; do
+		role="${ROLES[$i]:-colour_$i}"
+		comma=","
+		[[ $i -eq $((${#colour_arr[@]} - 1)) ]] && comma=""
+		echo "  \"$role\": \"${colour_arr[$i]}\"$comma"
+	done
+	echo "}"
+	return 0
+}
+
+# Output palette as formatted table with WCAG contrast check
+# Usage: _output_palette_table <colour_arr[@]>
+_output_palette_table() {
+	local -a colour_arr=("$@")
+	local i role ratio pass
+
+	echo ""
+	echo "  Generated Palette"
+	echo "  ─────────────────────────────────"
+	for i in "${!colour_arr[@]}"; do
+		role="${ROLES[$i]:-colour_$i}"
+		printf "  %-12s  %s\n" "$role" "${colour_arr[$i]}"
+	done
+	echo ""
+
+	# Contrast check: text (position 4) on background (position 0)
+	if [[ ${#colour_arr[@]} -ge 5 ]]; then
+		ratio=$(calc_contrast "${colour_arr[4]}" "${colour_arr[0]}")
+		pass="FAIL"
+		if awk "BEGIN { exit !($ratio >= 4.5) }" 2>/dev/null; then
+			pass="PASS"
+		fi
+		echo "  Contrast (text on bg): ${ratio}:1 [WCAG AA: ${pass}]"
+	else
+		print_warning "Palette has fewer than 5 colours; contrast check skipped"
+	fi
+	echo ""
+	return 0
+}
+
 # Generate palette command
 cmd_generate() {
 	local lock_spec=""
@@ -221,10 +310,18 @@ cmd_generate() {
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		--lock)
+			if [[ $# -lt 2 || "$2" == --* ]]; then
+				print_error "Missing value for --lock"
+				return 1
+			fi
 			lock_spec="$2"
 			shift 2
 			;;
 		--model)
+			if [[ $# -lt 2 || "$2" == --* ]]; then
+				print_error "Missing value for --model"
+				return 1
+			fi
 			model="$2"
 			shift 2
 			;;
@@ -236,83 +333,29 @@ cmd_generate() {
 			usage
 			return 0
 			;;
-		*) shift ;;
+		*)
+			print_error "Unknown option: $1"
+			usage >&2
+			return 1
+			;;
 		esac
 	done
 
-	# Build input array
-	local input="[\"N\",\"N\",\"N\",\"N\",\"N\"]"
-	if [[ -n "$lock_spec" ]]; then
-		if [[ "$lock_spec" == *","* ]]; then
-			# Comma-separated: parse each position
-			local parts
-			IFS=',' read -ra parts <<<"$lock_spec"
-			local arr_items=()
-			for p in "${parts[@]}"; do
-				p="$(echo "$p" | xargs)" # trim whitespace
-				if [[ "$p" == "N" || "$p" == "n" ]]; then
-					arr_items+=("\"N\"")
-				else
-					arr_items+=("$(hex_to_rgb "$p")")
-				fi
-			done
-			# Pad to 5 items
-			while [[ ${#arr_items[@]} -lt 5 ]]; do
-				arr_items+=("\"N\"")
-			done
-			input="[$(
-				IFS=,
-				echo "${arr_items[*]}"
-			)]"
-		else
-			# Single hex: lock position 1 (darkest)
-			local rgb
-			rgb=$(hex_to_rgb "$lock_spec")
-			input="[${rgb},\"N\",\"N\",\"N\",\"N\"]"
-		fi
-	fi
+	local input colours
+	local colour_arr=()
 
+	input=$(_build_colormind_input "$lock_spec")
 	print_info "Generating palette (model: $model)..."
-
-	local colours
 	colours=$(call_colormind "$input" "$model") || return 1
 
-	# Parse into array
-	local colour_arr=()
 	while IFS= read -r line; do
 		colour_arr+=("$line")
 	done <<<"$colours"
 
 	if [[ "$json_output" == "true" ]]; then
-		echo "{"
-		for i in "${!colour_arr[@]}"; do
-			local role="${ROLES[$i]:-colour_$i}"
-			local comma=","
-			[[ $i -eq $((${#colour_arr[@]} - 1)) ]] && comma=""
-			echo "  \"$role\": \"${colour_arr[$i]}\"$comma"
-		done
-		echo "}"
+		_output_palette_json "${colour_arr[@]}"
 	else
-		echo ""
-		echo "  Generated Palette"
-		echo "  ─────────────────────────────────"
-		for i in "${!colour_arr[@]}"; do
-			local role="${ROLES[$i]:-colour_$i}"
-			printf "  %-12s  %s\n" "$role" "${colour_arr[$i]}"
-		done
-		echo ""
-
-		# Contrast checks
-		local bg="${colour_arr[0]}"
-		local text="${colour_arr[4]}"
-		local ratio
-		ratio=$(calc_contrast "$text" "$bg")
-		local pass="FAIL"
-		if awk "BEGIN { exit !($ratio >= 4.5) }" 2>/dev/null; then
-			pass="PASS"
-		fi
-		echo "  Contrast (text on bg): ${ratio}:1 [WCAG AA: ${pass}]"
-		echo ""
+		_output_palette_table "${colour_arr[@]}"
 	fi
 
 	return 0
