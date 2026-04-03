@@ -1784,9 +1784,9 @@
       "pr": 15455
     },
     ".agents/scripts/pulse-wrapper.sh": {
-      "hash": "8d2bfb896139cb73a0e7c457ca7b2af64db1038f",
-      "at": "2026-04-03T20:00:31Z",
-      "passes": 9,
+      "hash": "bb27a346df0d130c955de3bc32fa20c267eb93e0",
+      "at": "2026-04-03T20:28:07Z",
+      "passes": 10,
       "pr": 15086
     },
     ".agents/scripts/schema-validator-helper.sh": {
@@ -5261,15 +5261,15 @@
       "pr": 15490
     },
     "aidevops.sh": {
-      "hash": "4d119eaf3e763f5243f20988aec57409c1cd66cf",
-      "at": "2026-04-03T19:14:44Z",
-      "passes": 25,
+      "hash": "011fef5a74d51725a711a3ea9dd55a4216ce0ec1",
+      "at": "2026-04-03T20:28:48Z",
+      "passes": 26,
       "pr": 15470
     },
     "setup.sh": {
-      "hash": "59681c6ad6fa1cfa141095bc7ddd1ba0931edeaf",
-      "at": "2026-04-03T19:14:45Z",
-      "passes": 25,
+      "hash": "fb8a2ae1b68f33e5bf2b68e0bef0f7ea8d249ae9",
+      "at": "2026-04-03T20:28:48Z",
+      "passes": 26,
       "pr": 15470
     },
     "todo/tasks/GH#15363-brief.md": {
@@ -5756,9 +5756,9 @@
       "pr": 16281
     },
     ".agents/workflows/pre-edit.md": {
-      "hash": "ec41634850e71c7b985cac878f7c4cf0729839bd",
-      "at": "2026-04-03T19:14:44Z",
-      "passes": 1
+      "hash": "bab0a8ac9032cff5118aaf901e3cb6ce3937e215",
+      "at": "2026-04-03T20:43:55Z",
+      "passes": 2
     },
     ".agents/tools/video/remotion-trimming.md": {
       "hash": "57ee2b06a05de913ad21a9194b882a79b343b27f",
@@ -5885,6 +5885,12 @@
       "hash": "0b3ae2dacef095b9742f0bf5b5274a5884252f8e",
       "at": "2026-04-03T20:00:54Z",
       "pr": 16821,
+      "passes": 1
+    },
+    ".agents/tools/opencode/opencode-openai-auth.md": {
+      "hash": "06bba8991a5389d1973e41ced0b8c17b695c3ead",
+      "at": "2026-04-03T20:28:52Z",
+      "pr": 16788,
       "passes": 1
     }
   }
