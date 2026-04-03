@@ -4973,5 +4973,12 @@
       "pr": 15752,
       "passes": 1
     }
+  },
+  ".agents/workflows/pre-edit.md": {
+    "hash": "d87135a808a845416e0193a101bef0fd1c0b4a032969d819556ce109c40da4ba",
+    "issue": "GH#15439",
+    "lines_before": 78,
+    "lines_after": 72,
+    "status": "simplified"
   }
 }
