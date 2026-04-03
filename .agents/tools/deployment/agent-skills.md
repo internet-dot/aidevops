@@ -32,8 +32,6 @@ tools:
 
 ## SKILL.md Layout
 
-Each skill directory contains:
-
 ```text
 skill-name/
   SKILL.md       # Instructions for the agent (required)
