@@ -5066,10 +5066,10 @@
   },
   ".agents/marketing-sales/cro-chapter-18.md": {
     "at": "2026-04-03T00:00:00Z",
-    "hash": "8f9d0638afd69e7355c2dc342ea3dc3dcd5b27013b33eafb7033388f08c297fc",
+    "hash": "6ec74f54ef35a6330a5589188273140ddde59ddca90e2faa3780937100a4d952",
     "issue": "GH#15262",
     "lines_before": 122,
-    "lines_after": 118,
+    "lines_after": 119,
     "action": "tighten"
   }
 }

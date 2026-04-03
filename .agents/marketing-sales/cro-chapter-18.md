@@ -20,7 +20,7 @@ Real-world implementations across e-commerce, SaaS, and B2B. Builds on [Chapter 
 | Mobile Conversion | 0.8% | 1.6% | +100% |
 | AOV | $85 | $92 | +8% |
 | Monthly Revenue | $510K | $966K | +89% |
-| Annual Impact | — | $5.5M additional revenue | — |
+| Annual Impact | N/A | $5.5M additional revenue | N/A |
 
 ## 18.2 SaaS: B2B Project Management (Freemium)
 
@@ -41,7 +41,7 @@ Real-world implementations across e-commerce, SaaS, and B2B. Builds on [Chapter 
 | Feature Adoption | 35% | 62% | +77% |
 | Monthly Churn | 15% | 10% | -33% |
 | Monthly Revenue | $96K | $168K | +75% |
-| Annual Impact | — | $864K additional revenue + improved retention | — |
+| Annual Impact | N/A | $864K additional revenue + improved retention | N/A |
 
 ## 18.3 Lead Gen: B2B Consulting ($20M Revenue)
 
@@ -60,7 +60,7 @@ Real-world implementations across e-commerce, SaaS, and B2B. Builds on [Chapter 
 | Lead-to-Opp Rate | 5% | 12% | +140% |
 | Cost Per Opportunity | $3,000 | $792 | -74% |
 | Pipeline/Month | $2M | $4.8M | +140% |
-| Annual Impact | — | $33.6M additional pipeline | — |
+| Annual Impact | N/A | $33.6M additional pipeline | N/A |
 
 ## 18.4 Implementation Playbook
 
@@ -79,7 +79,8 @@ Real-world implementations across e-commerce, SaaS, and B2B. Builds on [Chapter 
 |--------|-------|
 | Month 2 | First A/B tests — headlines, CTAs, forms, social proof placement |
 | Month 3 | Test pricing presentation, product page layouts, checkout flow, email sequences. Implement winners. |
-| Weekly rhythm | Mon=review results, Tue=launch tests, Wed=deep analysis, Thu=creative dev, Fri=planning/docs |
+
+**Weekly rhythm:** Mon=review results, Tue=launch tests, Wed=deep analysis, Thu=creative dev, Fri=planning/docs.
 
 ### Phase 3: Advanced Optimization (Months 4–6)
 
