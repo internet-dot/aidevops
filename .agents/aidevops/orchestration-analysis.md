@@ -50,20 +50,15 @@ Missing file → exit: `ERROR: No report file found at $REPORT_FILE. Run orchest
 
 ## Trend Analysis
 
-When `historical_context.has_yesterday_report` or `has_week_ago_report` is true:
-
-1. Read referenced report files
-2. Compare: `token_efficiency.total_cost_usd`, `errors.launch_failure_rate_pct`, `concurrency.fill_rate_pct`, `throughput.prs_merged`
-3. Direction: `↑ improved`, `↓ degraded`, `→ stable` (±5% = stable)
-4. Flag regressions (degraded vs yesterday AND vs week-ago) as additional findings
+When `historical_context.has_yesterday_report` or `has_week_ago_report` is true: read referenced files, compare `token_efficiency.total_cost_usd`, `errors.launch_failure_rate_pct`, `concurrency.fill_rate_pct`, `throughput.prs_merged`. Direction: `↑ improved`, `↓ degraded`, `→ stable` (±5%). Flag regressions (degraded vs both yesterday AND week-ago) as additional findings.
 
 Note: `historical_context.week_ago_report_path` is a point-in-time snapshot, not a rolling average.
 
 ## Meta-Assessment
 
-1. **Coverage gaps**: Which metrics are `0` or missing that should have data?
-2. **Instrumentation improvements**: What additional data points would enable better diagnosis?
-3. **Confidence**: `high` (all key metrics populated), `medium` (some gaps), `low` (major gaps)
+1. **Coverage gaps**: metrics at `0` or missing that should have data
+2. **Instrumentation improvements**: additional data points for better diagnosis
+3. **Confidence**: `high` (all key metrics populated) | `medium` (some gaps) | `low` (major gaps)
 
 Low confidence → meta-assessment becomes a `medium` finding.
 
@@ -110,8 +105,6 @@ ${SIG_FOOTER}"
 
 ## Scheduling Context
 
-Invoked by `sh.aidevops.efficiency-analysis` launchd job:
-- **Phase 1** (collector): 05:00 daily → `efficiency-report-YYYY-MM-DD.json`
-- **Phase 2** (this agent): conditional — skipped if ALL skip thresholds pass AND not Sunday
+Invoked by `sh.aidevops.efficiency-analysis` launchd job. Phase 1 (collector): 05:00 daily → `efficiency-report-YYYY-MM-DD.json`. Phase 2 (this agent): conditional — skipped if ALL skip thresholds pass AND not Sunday.
 
 **Skip thresholds** (all must pass to skip): `errors.launch_failure_rate_pct` < 5%, `concurrency.fill_rate_pct` > 40%, `audit_trails.issues_closed_without_pr_link` == 0, `audit_trails.prs_without_merge_summary` == 0, `token_efficiency.tokens_wasted_on_stalls` < 50000. Any threshold exceeded → Phase 2 runs regardless of day.
