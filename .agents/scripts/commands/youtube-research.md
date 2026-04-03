@@ -24,7 +24,7 @@ Target: $ARGUMENTS
 ### Step 2: Load Configuration
 
 ```bash
-~/.aidevops/agents/scripts/memory-helper.sh recall --namespace youtube "channel"
+~/.aidevops/agents/scripts/memory-helper.sh recall --namespace youtube "channel voice"
 ```
 
 ### Step 3: Execute Research
