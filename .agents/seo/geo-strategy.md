@@ -15,38 +15,41 @@ tools:
 
 # GEO Strategy
 
-Increase citation likelihood in AI search by matching decision criteria with verifiable page content on pages that already rank in traditional search.
+Increase citation likelihood in AI search by matching decision criteria with verifiable page content on pages that already rank in traditional search. GEO is an operational label, not a replacement for SEO — ranking is prerequisite.
 
 - Inputs: core query set, top landing pages, competitor set, proof assets (certifications, policies, prices, case evidence)
 - Outputs: criteria matrix, page gap map, prioritized implementation plan
-- GEO is an operational label, not a replacement for SEO
-- Ranking is prerequisite — unranked pages cannot be consistently cited
 - Optimize for deterministic retrieval signals, not daily answer volatility
 
 ## Workflow
 
 ### 1) Scope high-value intents
+
 - Select 5-20 intents that influence revenue or lead quality
 - Map each intent to an existing target page
 - Exclude intents without a realistic ranking path
 - Classify intents by grounding likelihood to avoid optimizing non-retrieval prompts
 
 ### 2) Extract decision criteria
+
 - Probe multiple models with targeted buying-decision prompts
 - Normalize outputs into concrete criteria (not vague advice)
 - Cluster by category: trust, expertise, fit, cost, delivery, risk
 
 ### 3) Score coverage per page
+
 - For each criterion, mark page state: strong, partial, missing, or not applicable
 - Require evidence references (URL section, data source, policy, certification)
 - Flag unsupported marketing claims immediately
 
 ### 4) Build retrieval-ready summaries
+
 - Add a concise criteria-matching block near top of page
 - Keep claims specific and self-contained
 - Prefer facts with provenance over broad brand language
 
 ### 5) Validate and iterate
+
 - Re-check retrieval fitness after edits
 - Evaluate coverage and consistency before citation counts
 - Monitor citations directionally, not as the only success metric
