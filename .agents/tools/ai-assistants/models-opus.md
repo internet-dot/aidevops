@@ -26,8 +26,6 @@ Highest-capability tier for tasks where stronger reasoning materially changes th
 
 ## When to Use
 
-Use opus only when the task genuinely needs extra reasoning depth:
-
 - Architecture and system design decisions
 - Novel problems with no established pattern
 - Security audits requiring deep reasoning
