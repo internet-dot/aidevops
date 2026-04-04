@@ -3,6 +3,8 @@
 
 # Design System: Corporate Traditional — Colour Palette & Roles
 
+Navy-and-gold palette conveying authority and trust. All hex values are exact; do not substitute.
+
 ## Primary
 
 | Role | Hex | Usage |
