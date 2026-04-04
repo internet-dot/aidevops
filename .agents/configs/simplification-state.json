@@ -6388,6 +6388,12 @@
       "at": "2026-04-04T08:00:00Z",
       "passes": 1,
       "status": "converged"
+    },
+    ".agents/tools/design/library/brands/raycast/02-color-palette.md": {
+      "hash": "da9e213d371ef3f75249eacd1017d83106328799",
+      "at": "2026-04-04T08:33:25Z",
+      "pr": "17227",
+      "passes": 1
     }
   },
   ".agents/tools/design/library/brands/clickhouse/DESIGN.md": {
