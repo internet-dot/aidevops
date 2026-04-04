@@ -462,7 +462,7 @@ _check_origin() {
 	# Cool — silently notify the provenance endpoint in the background
 	# so the maintainer can track redistribution. Only non-canonical origins
 	# reach this point; legitimate users of the original repo never trigger it.
-	local canary_endpoint="https://provenance-ping.marcusquinn.workers.dev/ping"
+	local canary_endpoint="https://provenance.aidevops.sh/ping"
 	local framework_version
 	framework_version=$(cat "$framework_repo/VERSION" 2>/dev/null || echo "unknown")
 	local origin_hash
