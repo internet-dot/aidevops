@@ -6375,6 +6375,11 @@
       "at": "2026-04-04T06:18:00Z",
       "passes": 1,
       "pr": 17142
+    },
+    ".agents/tools/design/library/styles/startup-bold/05-layout.md": {
+      "hash": "0cac11da037eec4ba3e744122fec7dea13206e5f",
+      "at": "2026-04-04T07:30:00Z",
+      "passes": 1
     }
   },
   ".agents/tools/design/library/brands/clickhouse/DESIGN.md": {
