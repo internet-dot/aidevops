@@ -5,29 +5,13 @@
 
 ## Buttons
 
-**Warm Sand (Secondary)**
-- Background: Warm Sand (`#e8e6dc`) · Text: Charcoal Warm (`#4d4c48`)
-- Padding: 0px 12px 0px 8px (asymmetric — icon-first layout)
-- Radius: 8px · Shadow: `#e8e6dc 0px 0px 0px 0px, #d1cfc5 0px 0px 0px 1px`
-
-**White Surface**
-- Background: Pure White (`#ffffff`) · Text: Anthropic Near Black (`#141413`)
-- Padding: 8px 16px 8px 12px · Radius: 12px
-- Hover: shifts to secondary background color
-
-**Dark Charcoal**
-- Background: Dark Surface (`#30302e`) · Text: Ivory (`#faf9f5`)
-- Padding: 0px 12px 0px 8px · Radius: 8px
-- Shadow: `#30302e 0px 0px 0px 0px, ring 0px 0px 0px 1px`
-
-**Brand Terracotta** — primary CTA; only chromatic button
-- Background: Terracotta Brand (`#c96442`) · Text: Ivory (`#faf9f5`)
-- Radius: 8–12px · Shadow: `#c96442 0px 0px 0px 0px, #c96442 0px 0px 0px 1px`
-
-**Dark Primary**
-- Background: Anthropic Near Black (`#141413`) · Text: Warm Silver (`#b0aea5`)
-- Padding: 9.6px 16.8px · Radius: 12px
-- Border: `1px solid #30302e` (dark theme surfaces)
+| Variant | Background | Text | Padding | Radius | Notes |
+|---------|-----------|------|---------|--------|-------|
+| Warm Sand (Secondary) | `#e8e6dc` | `#4d4c48` | `0px 12px 0px 8px` | 8px | Asymmetric — icon-first layout; shadow: `#e8e6dc 0px 0px 0px 0px, #d1cfc5 0px 0px 0px 1px` |
+| White Surface | `#ffffff` | `#141413` | `8px 16px 8px 12px` | 12px | Hover: shifts to secondary background |
+| Dark Charcoal | `#30302e` | `#faf9f5` | `0px 12px 0px 8px` | 8px | Shadow: `#30302e 0px 0px 0px 0px, ring 0px 0px 0px 1px` |
+| Brand Terracotta | `#c96442` | `#faf9f5` | — | 8–12px | Primary CTA; only chromatic button; shadow: `#c96442 0px 0px 0px 0px, #c96442 0px 0px 0px 1px` |
+| Dark Primary | `#141413` | `#b0aea5` | `9.6px 16.8px` | 12px | Border: `1px solid #30302e` (dark theme surfaces) |
 
 ## Cards & Containers
 
@@ -62,15 +46,8 @@
 
 ## Distinctive Components
 
-**Model Comparison Cards**
-- Opus 4.5, Sonnet 4.5, Haiku 4.5 in bordered card grid
-- Name, description, capability badges per card
-- Border Warm (`#e8e6dc`) separation between items
+**Model Comparison Cards** — Opus 4.5, Sonnet 4.5, Haiku 4.5 in bordered card grid; name, description, capability badges per card; Border Warm (`#e8e6dc`) separation
 
-**Organic Illustrations**
-- Hand-drawn-feeling vector illustrations: terracotta, black, muted green
-- Abstract/conceptual (not literal product diagrams)
+**Organic Illustrations** — hand-drawn-feeling vector illustrations: terracotta, black, muted green; abstract/conceptual (not literal product diagrams)
 
-**Dark/Light Section Alternation**
-- Page alternates Parchment light and Near Black dark sections
-- Each section is a distinct visual environment
+**Dark/Light Section Alternation** — page alternates Parchment light and Near Black dark sections; each section is a distinct visual environment
