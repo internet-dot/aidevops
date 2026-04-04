@@ -32,6 +32,7 @@ Shared defaults (all variants unless noted): padding 8px 16px · radius 6px · a
 - Background: `#f7f4ed` · Border: `1px solid #eceae4`
 - Radius: 12px (standard), 16px (featured), 8px (compact)
 - No box-shadow — borders define boundaries
+- Image cards: same border, 12px radius
 
 ## Inputs & Forms
 
