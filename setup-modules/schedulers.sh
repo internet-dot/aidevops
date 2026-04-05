@@ -676,6 +676,7 @@ After=network.target
 
 [Service]
 Type=oneshot
+TimeoutStartSec=${PULSE_STALE_THRESHOLD_SECONDS}
 KillMode=process
 ExecStart=/bin/bash ${wrapper_script}
 ${_env_lines}StandardOutput=append:${HOME}/.aidevops/logs/pulse-wrapper.log
