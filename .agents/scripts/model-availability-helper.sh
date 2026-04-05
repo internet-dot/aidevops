@@ -495,17 +495,15 @@ _probe_local() {
 	local endpoint
 	endpoint=$(get_provider_endpoint "local" 2>/dev/null) || endpoint="http://localhost:8080/v1/models"
 
-	local start_ms response http_code body models_count=0 duration_ms=0
-	start_ms=$(date +%s%N 2>/dev/null || echo "0")
-	response=$(curl -s -w "\n%{http_code}" --max-time "$PROBE_TIMEOUT" "$endpoint" 2>/dev/null) || true
-	local end_ms
-	end_ms=$(date +%s%N 2>/dev/null || echo "0")
-	if [[ "$start_ms" != "0" && "$end_ms" != "0" ]]; then
-		duration_ms=$(((end_ms - start_ms) / 1000000))
-	fi
+	local response http_code time_total body models_count=0 duration_ms=0
+	response=$(curl -s -w "\n%{http_code}\n%{time_total}" --max-time "$PROBE_TIMEOUT" "$endpoint" 2>/dev/null) || true
 
-	http_code=$(echo "$response" | tail -1)
-	body=$(echo "$response" | sed '$d')
+	http_code=$(echo "$response" | tail -2 | head -1)
+	time_total=$(echo "$response" | tail -1)
+	body=$(echo "$response" | awk 'NR>2{print lines[NR%2]} {lines[NR%2]=$0}')
+	if [[ -n "$time_total" && "$time_total" != "0" ]]; then
+		duration_ms=$(echo "$time_total" | awk '{printf "%d", $1 * 1000}')
+	fi
 
 	if [[ "$http_code" == "200" ]]; then
 		models_count=$(echo "$body" | jq -r '.data | length' 2>/dev/null || echo "0")
@@ -532,17 +530,15 @@ _probe_ollama() {
 	local endpoint
 	endpoint=$(get_provider_endpoint "ollama" 2>/dev/null) || endpoint="http://localhost:11434/api/tags"
 
-	local start_ms response http_code body models_count=0 duration_ms=0
-	start_ms=$(date +%s%N 2>/dev/null || echo "0")
-	response=$(curl -s -w "\n%{http_code}" --max-time "$PROBE_TIMEOUT" "$endpoint" 2>/dev/null) || true
-	local end_ms
-	end_ms=$(date +%s%N 2>/dev/null || echo "0")
-	if [[ "$start_ms" != "0" && "$end_ms" != "0" ]]; then
-		duration_ms=$(((end_ms - start_ms) / 1000000))
-	fi
+	local response http_code time_total body models_count=0 duration_ms=0
+	response=$(curl -s -w "\n%{http_code}\n%{time_total}" --max-time "$PROBE_TIMEOUT" "$endpoint" 2>/dev/null) || true
 
-	http_code=$(echo "$response" | tail -1)
-	body=$(echo "$response" | sed '$d')
+	http_code=$(echo "$response" | tail -2 | head -1)
+	time_total=$(echo "$response" | tail -1)
+	body=$(echo "$response" | awk 'NR>2{print lines[NR%2]} {lines[NR%2]=$0}')
+	if [[ -n "$time_total" && "$time_total" != "0" ]]; then
+		duration_ms=$(echo "$time_total" | awk '{printf "%d", $1 * 1000}')
+	fi
 
 	if [[ "$http_code" == "200" ]]; then
 		# Ollama /api/tags returns {"models": [...]}
