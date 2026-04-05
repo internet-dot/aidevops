@@ -641,7 +641,7 @@ _probe_build_request() {
 		return 1
 	fi
 
-	local curl_args="-s -w '\n%{http_code}' --max-time $PROBE_TIMEOUT -D -"
+	local curl_args="-s -w '\n%{http_code}\n%{time_total}' --max-time $PROBE_TIMEOUT -D -"
 	case "$provider" in
 	anthropic)
 		curl_args="$curl_args -H 'x-api-key: ${api_key}' -H 'anthropic-version: 2023-06-01'"
@@ -811,22 +811,24 @@ probe_provider() {
 	curl_extra=$(echo "$request_info" | tail -1)
 
 	# Execute probe (eval is safe: curl_extra is built from controlled provider strings)
-	local start_ms response end_ms duration_ms=0
-	start_ms=$(date +%s%N 2>/dev/null || echo "0")
+	local response duration_ms=0
 	# shellcheck disable=SC2086
 	response=$(eval curl $curl_extra "$endpoint" 2>/dev/null) || true
-	end_ms=$(date +%s%N 2>/dev/null || echo "0")
-	if [[ "$start_ms" != "0" && "$end_ms" != "0" ]]; then
-		duration_ms=$(((end_ms - start_ms) / 1000000))
-	fi
 
-	# Split response into headers and body
-	local http_code headers body
-	# _probe_build_request appends one trailer line: http_code.
-	http_code=$(echo "$response" | tail -1)
+	# Split response into headers, body, http_code, and time_total.
+	# _probe_build_request appends two trailer lines: http_code then time_total (from %{time_total}).
+	# %{time_total} is a curl built-in and is portable across macOS (BSD curl) and Linux (GNU curl).
+	local http_code time_total headers body
+	http_code=$(echo "$response" | tail -2 | head -1)
+	time_total=$(echo "$response" | tail -1)
 	headers=$(echo "$response" | sed '/^$/q' | head -50)
-	# Drop the last line (http_code) from the body after the blank-line header separator
-	body=$(echo "$response" | sed '1,/^$/d' | awk 'NR>1{print prev} {prev=$0}')
+	# Drop the header section and the two curl write-out trailer lines (http_code, time_total).
+	# Uses awk to buffer and emit lines with a 2-line lag, which is portable across macOS and Linux.
+	body=$(echo "$response" | sed '1,/^$/d' | awk 'NR>2{print lines[NR%2]} {lines[NR%2]=$0}')
+	# Convert time_total (fractional seconds, e.g. "0.123456") to milliseconds.
+	if [[ -n "$time_total" && "$time_total" != "0" ]]; then
+		duration_ms=$(echo "$time_total" | awk '{printf "%d", $1 * 1000}')
+	fi
 
 	_parse_rate_limits "$provider" "$headers"
 
