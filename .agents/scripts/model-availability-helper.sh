@@ -495,17 +495,13 @@ _probe_local() {
 	local endpoint
 	endpoint=$(get_provider_endpoint "local" 2>/dev/null) || endpoint="http://localhost:8080/v1/models"
 
-	local start_ms response http_code body models_count=0 duration_ms=0
-	start_ms=$(date +%s%N 2>/dev/null || echo "0")
-	response=$(curl -s -w "\n%{http_code}" --max-time "$PROBE_TIMEOUT" "$endpoint" 2>/dev/null) || true
-	local end_ms
-	end_ms=$(date +%s%N 2>/dev/null || echo "0")
-	if [[ "$start_ms" != "0" && "$end_ms" != "0" ]]; then
-		duration_ms=$(((end_ms - start_ms) / 1000000))
-	fi
+	local response http_code body models_count=0 duration_ms=0 time_total
+	response=$(curl -s -w "\n%{http_code}\n%{time_total}" --max-time "$PROBE_TIMEOUT" "$endpoint" 2>/dev/null) || true
+	time_total=$(echo "$response" | tail -1)
+	duration_ms=$(_probe_duration_ms_from_curl "$time_total") || duration_ms=0
 
-	http_code=$(echo "$response" | tail -1)
-	body=$(echo "$response" | sed '$d')
+	http_code=$(echo "$response" | tail -2 | head -1)
+	body=$(echo "$response" | sed '$d' | sed '$d')
 
 	if [[ "$http_code" == "200" ]]; then
 		models_count=$(echo "$body" | jq -r '.data | length' 2>/dev/null || echo "0")
@@ -532,17 +528,13 @@ _probe_ollama() {
 	local endpoint
 	endpoint=$(get_provider_endpoint "ollama" 2>/dev/null) || endpoint="http://localhost:11434/api/tags"
 
-	local start_ms response http_code body models_count=0 duration_ms=0
-	start_ms=$(date +%s%N 2>/dev/null || echo "0")
-	response=$(curl -s -w "\n%{http_code}" --max-time "$PROBE_TIMEOUT" "$endpoint" 2>/dev/null) || true
-	local end_ms
-	end_ms=$(date +%s%N 2>/dev/null || echo "0")
-	if [[ "$start_ms" != "0" && "$end_ms" != "0" ]]; then
-		duration_ms=$(((end_ms - start_ms) / 1000000))
-	fi
+	local response http_code body models_count=0 duration_ms=0 time_total
+	response=$(curl -s -w "\n%{http_code}\n%{time_total}" --max-time "$PROBE_TIMEOUT" "$endpoint" 2>/dev/null) || true
+	time_total=$(echo "$response" | tail -1)
+	duration_ms=$(_probe_duration_ms_from_curl "$time_total") || duration_ms=0
 
-	http_code=$(echo "$response" | tail -1)
-	body=$(echo "$response" | sed '$d')
+	http_code=$(echo "$response" | tail -2 | head -1)
+	body=$(echo "$response" | sed '$d' | sed '$d')
 
 	if [[ "$http_code" == "200" ]]; then
 		# Ollama /api/tags returns {"models": [...]}
@@ -631,6 +623,24 @@ _probe_ollama_context_length() {
 # Outputs two lines: first the endpoint URL, then the curl args (space-separated).
 # Caller must reconstruct the array from the second line.
 # Sets REPLY_ENDPOINT and REPLY_CURL_ARGS (space-separated) in caller scope via stdout.
+_probe_duration_ms_from_curl() {
+	local time_total="$1"
+
+	if [[ -z "$time_total" ]]; then
+		printf '0\n'
+		return 1
+	fi
+
+	awk -v seconds="$time_total" 'BEGIN {
+		ms = int((seconds + 0) * 1000 + 0.5)
+		if (ms < 0) {
+			ms = 0
+		}
+		print ms
+	}'
+	return 0
+}
+
 _probe_build_request() {
 	local provider="$1"
 	local api_key="$2"
@@ -641,7 +651,7 @@ _probe_build_request() {
 		return 1
 	fi
 
-	local curl_args="-s -w '\n%{http_code}' --max-time $PROBE_TIMEOUT -D -"
+	local curl_args="-s -w '\n%{http_code}\n%{time_total}' --max-time $PROBE_TIMEOUT -D -"
 	case "$provider" in
 	anthropic)
 		curl_args="$curl_args -H 'x-api-key: ${api_key}' -H 'anthropic-version: 2023-06-01'"
@@ -811,22 +821,19 @@ probe_provider() {
 	curl_extra=$(echo "$request_info" | tail -1)
 
 	# Execute probe (eval is safe: curl_extra is built from controlled provider strings)
-	local start_ms response end_ms duration_ms=0
-	start_ms=$(date +%s%N 2>/dev/null || echo "0")
+	local response duration_ms=0 time_total
 	# shellcheck disable=SC2086
 	response=$(eval curl $curl_extra "$endpoint" 2>/dev/null) || true
-	end_ms=$(date +%s%N 2>/dev/null || echo "0")
-	if [[ "$start_ms" != "0" && "$end_ms" != "0" ]]; then
-		duration_ms=$(((end_ms - start_ms) / 1000000))
-	fi
+	time_total=$(echo "$response" | tail -1)
+	duration_ms=$(_probe_duration_ms_from_curl "$time_total") || duration_ms=0
 
 	# Split response into headers and body
 	local http_code headers body
-	# _probe_build_request appends one trailer line: http_code.
-	http_code=$(echo "$response" | tail -1)
+	# _probe_build_request appends two trailer lines: http_code and time_total.
+	http_code=$(echo "$response" | tail -2 | head -1)
 	headers=$(echo "$response" | sed '/^$/q' | head -50)
-	# Drop the last line (http_code) from the body after the blank-line header separator
-	body=$(echo "$response" | sed '1,/^$/d' | awk 'NR>1{print prev} {prev=$0}')
+	# Drop the last two lines (http_code and time_total) from the body after the blank-line header separator.
+	body=$(echo "$response" | sed '1,/^$/d' | awk 'NR>2{print prev_prev} {prev_prev=prev; prev=$0}')
 
 	_parse_rate_limits "$provider" "$headers"
 
