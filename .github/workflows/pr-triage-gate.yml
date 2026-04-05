@@ -1,63 +1,73 @@
-name: Issue Triage Gate
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2025-2026 Marcus Quinn
+#
+# PR Triage Gate (t1894)
+#
+# Analogous to issue-triage-gate.yml but for pull requests.
+# Applies needs-maintainer-review to PRs from non-collaborators
+# on creation, ensuring the cryptographic approval gate covers PRs
+# regardless of how they were created (web UI, API, fork, etc.).
+#
+# The maintainer-gate.yml enforces this at merge time; this workflow
+# ensures the label exists from the moment the PR is opened.
+
+name: PR Triage Gate
 
 on:
-  issues:
+  pull_request_target:
     types: [opened]
 
 permissions:
+  pull-requests: write
   issues: write
 
 jobs:
   triage:
+    name: PR Author Triage
     runs-on: ubuntu-latest
     timeout-minutes: 2
     concurrency:
-      group: issue-triage-${{ github.event.issue.number }}
+      group: pr-triage-${{ github.event.pull_request.number }}
       cancel-in-progress: true
     steps:
       - name: Check author association and apply triage label
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
-            const issue = context.payload.issue;
-            const author = issue.user.login;
-            const association = issue.author_association;
-            const title = issue.title || '';
+            const pr = context.payload.pull_request;
+            const author = pr.user.login;
+            const association = pr.author_association;
 
-            // Bot accounts always bypass triage (github-actions[bot], dependabot, etc.)
-            if (issue.user.type === 'Bot') {
+            // Bot accounts always bypass triage
+            if (pr.user.type === 'Bot') {
               console.log(`Author ${author} is a bot — bypassing triage`);
               return;
             }
 
-            // Issues with task ID prefix (t1234: ...) are from internal tooling — bypass
+            // PRs with task ID prefix (t1234: ...) are from internal tooling — bypass
+            const title = pr.title || '';
             if (/^t\d+/.test(title)) {
-              console.log(`Issue "${title}" has task ID prefix — bypassing triage`);
+              console.log(`PR "${title}" has task ID prefix — bypassing triage`);
+              return;
+            }
+
+            // PRs with GH# prefix are from internal tooling — bypass
+            if (/^GH#\d+/.test(title)) {
+              console.log(`PR "${title}" has GH# prefix — bypassing triage`);
               return;
             }
 
             // Maintainers and collaborators bypass triage
             // OWNER, MEMBER, COLLABORATOR are trusted roles
+            // CONTRIBUTOR (has previous merged PRs) is NOT trusted
             const trustedRoles = ['OWNER', 'MEMBER', 'COLLABORATOR'];
 
             if (trustedRoles.includes(association)) {
               console.log(`Author ${author} has role ${association} — bypassing triage`);
-
-              // Remove needs-maintainer-review if the YAML form template added it
-              try {
-                await github.rest.issues.removeLabel({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issue.number,
-                  name: 'needs-maintainer-review'
-                });
-              } catch (e) {
-                // Label may not exist yet — that's fine
-              }
               return;
             }
 
-            console.log(`Author ${author} has role ${association} — applying triage gate`);
+            console.log(`Author ${author} has role ${association} — applying triage gate to PR #${pr.number}`);
 
             // Ensure needs-maintainer-review label exists
             try {
@@ -72,21 +82,21 @@ jobs:
               // Label already exists — expected
             }
 
-            // Ensure the label is applied (template may have added it, but belt-and-suspenders)
+            // Apply labels
             await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: issue.number,
-              labels: ['needs-maintainer-review']
+              issue_number: pr.number,
+              labels: ['needs-maintainer-review', 'external-contributor']
             });
 
-            // Remove any auto-dispatch labels that could trigger the pipeline
+            // Remove any auto-dispatch labels
             for (const label of ['status:available', 'auto-dispatch']) {
               try {
                 await github.rest.issues.removeLabel({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  issue_number: issue.number,
+                  issue_number: pr.number,
                   name: label
                 });
               } catch (e) {
@@ -94,19 +104,19 @@ jobs:
               }
             }
 
-            // Post a welcome comment
+            // Post a comment with approval instructions
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: issue.number,
+              issue_number: pr.number,
               body: [
-                `Thanks for the report, @${author}.`,
+                `Thanks for the contribution, @${author}.`,
                 '',
-                'This issue has been queued for maintainer review. A maintainer will review it and either:',
-                '- **Approve** it using: `sudo aidevops approve issue ' + issue.number + '`',
-                '- **Ask for more information** if the report needs clarification',
+                'This PR has been queued for maintainer review. A maintainer will review it and either:',
+                '- **Approve** it using: `sudo aidevops approve pr ' + pr.number + '`',
+                '- **Request changes** if modifications are needed',
                 '- **Close** it if it\'s a duplicate or out of scope',
                 '',
-                '**Tip:** For faster, higher-quality issue reporting, use `/log-issue-aidevops` in your AI assistant session. It gathers diagnostics automatically and checks for duplicates.'
+                'The PR cannot be merged until a maintainer provides cryptographic approval.'
               ].join('\n')
             });
