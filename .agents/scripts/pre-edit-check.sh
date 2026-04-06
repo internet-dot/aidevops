@@ -686,24 +686,14 @@ handle_feature_branch() {
 		is_main_worktree=true
 	fi
 
-	# Sync terminal tab title with repo/branch (silent, non-blocking)
 	local script_dir
 	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || exit
 	# shellcheck source=/dev/null
 	source "${script_dir}/shared-constants.sh"
 
-	if [[ -x "$script_dir/terminal-title-helper.sh" ]]; then
-		"$script_dir/terminal-title-helper.sh" sync 2>/dev/null || true
-	fi
-
-	# Sync OpenCode session title with current branch (silent, non-blocking).
-	# Only runs inside OpenCode sessions; helper resolves target session by cwd.
-	if [[ "${OPENCODE:-}" == "1" ]] && [[ -x "$script_dir/session-rename-helper.sh" ]]; then
-		"$script_dir/session-rename-helper.sh" sync-branch >/dev/null 2>&1 || true
-	fi
-
 	# Linked worktree ownership gate (GH#14413 hardening):
 	# exactly one active session/process may hold a writable worktree at a time.
+	# Run BEFORE title/session sync so blocked contexts don't get side effects.
 	local worktree_path
 	worktree_path=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 	local worktree_owner_pid="${OPENCODE_PID:-${PRE_EDIT_OWNER_PID:-${PPID:-$$}}}"
@@ -718,6 +708,18 @@ handle_feature_branch() {
 			fi
 			_handle_ownership_conflict "$worktree_path" "$owner_pid" "$owner_session" "$owner_created"
 		fi
+	fi
+
+	# Sync terminal tab title with repo/branch (silent, non-blocking)
+	# Runs after ownership claim succeeds to avoid side effects on blocked contexts.
+	if [[ -x "$script_dir/terminal-title-helper.sh" ]]; then
+		"$script_dir/terminal-title-helper.sh" sync 2>/dev/null || true
+	fi
+
+	# Sync OpenCode session title with current branch (silent, non-blocking).
+	# Only runs inside OpenCode sessions; helper resolves target session by cwd.
+	if [[ "${OPENCODE:-}" == "1" ]] && [[ -x "$script_dir/session-rename-helper.sh" ]]; then
+		"$script_dir/session-rename-helper.sh" sync-branch >/dev/null 2>&1 || true
 	fi
 
 	if [[ "$is_main_worktree" == "true" ]]; then
