@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.134] - 2026-04-06
+
+### Added
+
+- claim release on worker failure + lifecycle logging
+
 ## [3.6.132] - 2026-04-06
 
 ### Fixed
