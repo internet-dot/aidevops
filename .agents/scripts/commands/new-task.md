@@ -75,7 +75,7 @@ fi
 | **Origin** | Created date, session ID, author (human/ai-supervisor/ai-interactive), parent task |
 | **What** | Clear deliverable — what it must produce, not just "implement X" |
 | **Why** | Problem, user need, business value, or dependency |
-| **How** | Technical approach, key files (`path/to/file.ts:45`), patterns to follow |
+| **How** | Files to Modify (`NEW:`/`EDIT:` with paths), Implementation Steps (numbered, concrete), Verification (commands to confirm). See `templates/brief-template.md` for structured format. A brief without file paths produces vague issues that waste worker tokens — search the codebase (`git ls-files`, `rg`) to find them if unknown. |
 | **Acceptance** | Specific testable criteria + "Tests pass" + "Lint clean" |
 | **Context** | Key decisions, constraints, things ruled out |
 

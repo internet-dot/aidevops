@@ -28,9 +28,11 @@ Fatal modes: **GH#5317** (exits without PR), **GH#5096** (exits after PR). Do NO
 
 ---
 
-## Step 0: Resolve Task ID
+## Step 0: Resolve Task ID and Read Implementation Context
 
 Extract first positional arg; if ` -- ` present, use suffix (t158). Resolve `t\d+` via TODO.md or `gh issue list`. Extract issue number: `sed -En 's/.*[Ii]ssue[[:space:]]*#*([0-9]+).*/\1/p'`.
+
+**Implementation context (t1901 — read BEFORE exploring):** After resolving the issue, read its body. Look for a "Worker Guidance" or "How" section containing Files to Modify, Implementation Steps, and Verification commands. If present, these are your mentor's instructions — follow them directly. Read only the referenced files, not the entire codebase. If the issue body lacks file paths and implementation steps, exit BLOCKED with reason "missing implementation context" rather than exploring broadly.
 
 - **Decomposition (t1408.2):** Skip if `--no-decompose` or has subtasks. `task-decompose-helper.sh classify "$TASK_DESC"`. Composite headless → auto-decompose, exit `DECOMPOSED: ...`. Max depth 3.
 - **Claim (t1017):** Add `assignee:<identity> started:<ISO>` to TODO.md. Push rejection = claimed → **STOP**.
