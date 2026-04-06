@@ -101,6 +101,19 @@ is_aidevops_repo() {
 	r=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
 	[[ "$r" == *"/aidevops"* ]] || [[ -f "$r/.aidevops-repo" ]]
 }
+
+detect_repo_name_with_owner() {
+	local detected_repo=""
+	detected_repo=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null || echo "")
+	if [[ -z "$detected_repo" ]]; then
+		print_error "Cannot detect repo. Pass REPO as second argument or via --repo."
+		return 1
+	fi
+
+	printf '%s\n' "$detected_repo"
+	return 0
+}
+
 get_current_branch() { git branch --show-current 2>/dev/null || echo ""; }
 is_on_feature_branch() {
 	local b
@@ -376,11 +389,7 @@ cmd_pre_merge_gate() {
 
 	# Auto-detect repo from git remote if not provided
 	if [[ -z "$repo" ]]; then
-		repo=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null || echo "")
-		if [[ -z "$repo" ]]; then
-			print_error "Cannot detect repo. Pass REPO as second argument."
-			return 1
-		fi
+		repo=$(detect_repo_name_with_owner) || return 1
 	fi
 
 	local rbg_helper="${SCRIPT_DIR}/review-bot-gate-helper.sh"
@@ -402,7 +411,7 @@ cmd_pre_merge_gate() {
 	rbg_result=$(bash "$rbg_helper" wait "$pr_number" "$repo" 2>&1) || true
 
 	local rbg_status=""
-	rbg_status=$(printf '%s' "$rbg_result" | grep -oE '^(PASS|SKIP|WAITING|PASS_RATE_LIMITED)' | head -1)
+	rbg_status=$(printf '%s' "$rbg_result" | grep -oE '(PASS|SKIP|WAITING|PASS_RATE_LIMITED)' | tail -1)
 
 	case "$rbg_status" in
 	PASS | SKIP | PASS_RATE_LIMITED)
@@ -425,30 +434,50 @@ cmd_pre_merge_gate() {
 # Exit codes: 0 = merged, 1 = gate failed or merge failed
 cmd_merge() {
 	local pr_number="${1:-}"
-	local repo="${2:-}"
+	local repo=""
 	local merge_method="--squash"
 
 	if [[ -z "$pr_number" ]]; then
 		print_error "Usage: full-loop-helper.sh merge <PR_NUMBER> [REPO] [--squash|--merge|--rebase]"
 		return 1
 	fi
+	shift
 
-	# Parse optional repo and merge method
-	if [[ "${repo:-}" == --* ]]; then
-		merge_method="$repo"
-		repo=""
-	fi
-	if [[ -n "${3:-}" && "${3:-}" == --* ]]; then
-		merge_method="$3"
-	fi
+	# Parse optional repo and merge method from remaining arguments.
+	# Keep an explicit allowlist for flags that consume a following argument.
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--squash | --merge | --rebase)
+			merge_method="$1"
+			shift
+			;;
+		--repo | -R)
+			if [[ $# -lt 2 || -z "${2:-}" ]]; then
+				print_error "Missing value for $1"
+				return 1
+			fi
+			repo="$2"
+			shift 2
+			;;
+		--*)
+			print_error "Unknown option: $1"
+			return 1
+			;;
+		*)
+			if [[ -z "$repo" ]]; then
+				repo="$1"
+				shift
+			else
+				print_error "Unknown argument: $1"
+				return 1
+			fi
+			;;
+		esac
+	done
 
 	# Auto-detect repo from git remote if not provided
 	if [[ -z "$repo" ]]; then
-		repo=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null || echo "")
-		if [[ -z "$repo" ]]; then
-			print_error "Cannot detect repo. Pass REPO as second argument."
-			return 1
-		fi
+		repo=$(detect_repo_name_with_owner) || return 1
 	fi
 
 	# Gate: enforce review-bot-gate before merge
