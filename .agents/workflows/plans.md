@@ -77,6 +77,8 @@ Add `#auto-dispatch` only when ALL inclusion criteria pass and NO exclusion crit
 
 Every task MUST have `todo/tasks/{task_id}-brief.md`. Use `templates/brief-template.md`. Captures: origin (session ID, date, author), what, why, how (with file refs), acceptance criteria, context. Detect runtime: `$OPENCODE_SESSION_ID`, `$CLAUDE_SESSION_ID`, or `{app}:unknown-{date}`.
 
+**Code scaffolding (t1901 — MANDATORY for code tasks):** The brief's How section must include code skeletons for each file in Files to Modify. Read the reference pattern file and draft the skeleton — new files get complete structure with imports, function signatures, and inline comments marking where logic goes; edits get the exact code block to insert with surrounding context. The implementing worker should copy and fill in, not invent structure from scratch. This is the single highest-leverage thing you can do to make a task succeed on first dispatch.
+
 ### Task Description Quality (GH#6419)
 
 Task descriptions in TODO.md become GitHub issue titles — primary input to pulse duplicate detection. Include **what** (action), **where** (component/file/feature area), **when/why** (triggering condition). Exception: persistent/pinned monitoring issues keep concise titles.
