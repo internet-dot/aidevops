@@ -37,6 +37,30 @@ print_success() { printf "${GREEN}[OK]${NC} %s\n" "$1"; }
 print_warning() { printf "${YELLOW}[WARN]${NC} %s\n" "$1"; }
 print_error() { printf "${RED}[ERROR]${NC} %s\n" "$1"; }
 
+copy_hook_script() {
+	local source_path="$1"
+	local target_path="$2"
+
+	cp "$source_path" "$target_path"
+	chmod +x "$target_path"
+	print_success "Installed $target_path"
+	return 0
+}
+
+remove_hook_script() {
+	local hook_path="$1"
+	local missing_message="$2"
+
+	if [[ ! -f "$hook_path" ]]; then
+		print_info "$missing_message"
+		return 0
+	fi
+
+	rm "$hook_path"
+	print_success "Removed $hook_path"
+	return 0
+}
+
 # Find the source hook script (repo .agents/hooks/ or deployed ~/.aidevops/agents/hooks/)
 find_source_hook() {
 	local hook_name="${1:-git_safety_guard.py}"
@@ -76,12 +100,8 @@ install_hook() {
 	mkdir -p "$HOOKS_DIR"
 
 	# Copy hook script
-	cp "$source_hook" "$HOOK_SCRIPT"
-	chmod +x "$HOOK_SCRIPT"
-	print_success "Installed $HOOK_SCRIPT"
-	cp "$source_post_hook" "$POST_HOOK_SCRIPT"
-	chmod +x "$POST_HOOK_SCRIPT"
-	print_success "Installed $POST_HOOK_SCRIPT"
+	copy_hook_script "$source_hook" "$HOOK_SCRIPT" || return 1
+	copy_hook_script "$source_post_hook" "$POST_HOOK_SCRIPT" || return 1
 
 	# Configure Claude Code settings.json
 	configure_claude_settings || return 1
@@ -244,18 +264,8 @@ uninstall_hook() {
 	print_info "Removing Claude Code safety hooks..."
 
 	# Remove hook script
-	if [[ -f "$HOOK_SCRIPT" ]]; then
-		rm "$HOOK_SCRIPT"
-		print_success "Removed $HOOK_SCRIPT"
-	else
-		print_info "Hook script not found (already removed)"
-	fi
-	if [[ -f "$POST_HOOK_SCRIPT" ]]; then
-		rm "$POST_HOOK_SCRIPT"
-		print_success "Removed $POST_HOOK_SCRIPT"
-	else
-		print_info "Post hook script not found (already removed)"
-	fi
+	remove_hook_script "$HOOK_SCRIPT" "Hook script not found (already removed)" || return 1
+	remove_hook_script "$POST_HOOK_SCRIPT" "Post hook script not found (already removed)" || return 1
 
 	# Remove from Claude settings
 	if [[ -f "$CLAUDE_SETTINGS" ]]; then
