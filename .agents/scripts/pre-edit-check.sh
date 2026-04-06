@@ -454,7 +454,8 @@ handle_main_branch() {
 			echo -e "${YELLOW}LOOP-AUTO${NC}: Code task detected, worktree required"
 		fi
 		echo "LOOP_DECISION=worktree"
-		exit 2 # Special exit code for "create worktree"
+		# Exit code 2 = "create worktree"
+		exit 2
 	fi
 
 	# Short-circuit: explicit --file on an allowlisted path is always allowed,
@@ -504,14 +505,14 @@ _show_main_branch_warning() {
 		echo "    ~/.aidevops/agents/scripts/worktree-helper.sh add {type}/{description}"
 		echo "    cd ../{repo}-{type}-{description}"
 		echo ""
-		echo "    (Install Worktrunk for better experience: brew install max-sixty/worktrunk/wt)"
+		echo "    (Install Worktrunk: brew install max-sixty/worktrunk/wt)"
 	fi
 	echo ""
 	echo -e "${YELLOW}Why worktrees? The main repo directory should ALWAYS stay on main.${NC}"
 	echo -e "${YELLOW}Using 'git checkout -b' here leaves the repo on a feature branch,${NC}"
 	echo -e "${YELLOW}which breaks parallel sessions and causes merge conflicts.${NC}"
 	echo ""
-	echo -e "${RED}DO NOT proceed with edits until you are inside a linked worktree.${NC}"
+	echo -e "${RED}DO NOT proceed with edits — switch to a linked worktree first.${NC}"
 	echo ""
 	return 0
 }
@@ -540,7 +541,7 @@ _handle_ownership_conflict() {
 		echo "WORKTREE_OWNER_PID=$o_pid"
 		[[ -n "$o_session" ]] && echo "WORKTREE_OWNER_SESSION=$o_session"
 		[[ -n "$o_created" ]] && echo "WORKTREE_OWNER_SINCE=$o_created"
-		echo "HINT: create a dedicated worktree for this session/task and retry"
+		echo "HINT: create a dedicated worktree to isolate this session/task and retry"
 		exit 2
 	fi
 
@@ -555,7 +556,7 @@ _handle_ownership_conflict() {
 	[[ -n "$o_session" ]] && echo "Owner session: $o_session"
 	[[ -n "$o_created" ]] && echo "Owned since: $o_created"
 	echo ""
-	echo -e "${YELLOW}Use a dedicated linked worktree for this session/task to avoid cross-session edits.${NC}"
+	echo -e "${YELLOW}Use a dedicated linked worktree to isolate this session/task and avoid cross-session edits.${NC}"
 	echo ""
 	exit 1
 }
@@ -625,13 +626,13 @@ _handle_main_worktree_off_main() {
 	echo ""
 	echo -e "Current ref: ${BOLD}$branch${NC}"
 	echo ""
-	echo -e "${YELLOW}The canonical repo directory should stay on 'main' for parallel safety.${NC}"
+	echo -e "${YELLOW}The canonical repo directory should stay on 'main' to ensure parallel safety.${NC}"
 	echo -e "${YELLOW}Move code work into a linked worktree path, not this canonical repo directory.${NC}"
 	echo ""
 	echo "Options:"
-	echo "  1. Create worktree for this task (recommended)"
+	echo "  1. Create a worktree dedicated to this task (recommended)"
 	echo "  2. Switch the canonical repo directory back to main"
-	echo "  3. Continue here temporarily (not recommended for code)"
+	echo "  3. Continue here temporarily (not recommended when editing code)"
 	echo ""
 	echo "MAIN_REPO_OFF_MAIN_WARNING=$branch"
 	exit 3
