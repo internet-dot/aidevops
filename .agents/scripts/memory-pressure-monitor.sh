@@ -869,29 +869,59 @@ cmd_status() {
 }
 
 # Run continuous monitoring loop with adaptive polling (faster when shellcheck detected)
-# Prevents multiple concurrent daemon instances via a PID file (GH#17408).
+# Prevents multiple concurrent daemon instances via atomic file locking (GH#17408, GH#17573).
+# Uses flock(1) when available (Linux + macOS/homebrew), falls back to atomic mkdir lock.
+# The previous PID-file-only approach had a TOCTOU race: multiple launchd triggers firing
+# within the same second could all pass the check simultaneously and all start.
 cmd_daemon() {
 	ensure_dirs
 	local pid_file="${STATE_DIR}/memory-pressure-monitor.pid"
+	local lock_file="${STATE_DIR}/memory-pressure-monitor.lock"
 
-	# Guard: prevent multiple daemon instances
-	if [[ -f "${pid_file}" ]]; then
-		local old_pid
-		old_pid=$(cat "${pid_file}" 2>/dev/null || echo "")
-		if [[ -n "$old_pid" ]] && [[ "$old_pid" =~ ^[0-9]+$ ]] && kill -0 "$old_pid" 2>/dev/null; then
-			echo "[${SCRIPT_NAME}] Daemon already running (PID ${old_pid}). Use --stop or --restart to control it." >&2
+	# Atomic lock acquisition — prevents race conditions (GH#17573)
+	# flock(1) is preferred: it holds the lock for the lifetime of the process via
+	# a file descriptor, so the lock is released automatically on crash/kill.
+	if command -v flock >/dev/null 2>&1; then
+		# Open lock file on fd 200 and acquire exclusive non-blocking lock.
+		# If another instance holds the lock, flock -n exits non-zero immediately.
+		exec 200>"${lock_file}"
+		if ! flock -n 200; then
+			echo "[${SCRIPT_NAME}] Daemon already running (lock held). Use --stop to control it." >&2
 			return 1
-		else
-			# Stale PID file — remove it and continue
-			rm -f "${pid_file}"
 		fi
+		# Lock is held on fd 200 for the lifetime of this process.
+		# No explicit cleanup needed — fd closes on exit, releasing the lock.
+	else
+		# Fallback: atomic mkdir lock (POSIX-guaranteed atomic on local filesystems).
+		# mkdir fails if the directory already exists, making it race-free.
+		local lock_dir="${STATE_DIR}/memory-pressure-monitor.lockdir"
+		if ! mkdir "${lock_dir}" 2>/dev/null; then
+			# Check if the owning process is still alive
+			local lock_pid=""
+			lock_pid=$(cat "${lock_dir}/pid" 2>/dev/null || echo "")
+			if [[ -n "$lock_pid" ]] && [[ "$lock_pid" =~ ^[0-9]+$ ]] && kill -0 "$lock_pid" 2>/dev/null; then
+				echo "[${SCRIPT_NAME}] Daemon already running (PID ${lock_pid}). Use --stop to control it." >&2
+				return 1
+			else
+				# Stale lock — remove and retry
+				rm -rf "${lock_dir}"
+				if ! mkdir "${lock_dir}" 2>/dev/null; then
+					echo "[${SCRIPT_NAME}] Failed to acquire lock (concurrent start?). Aborting." >&2
+					return 1
+				fi
+			fi
+		fi
+		echo $$ >"${lock_dir}/pid"
+		trap 'rm -rf "${lock_dir}"; rm -f "${pid_file}"; trap - EXIT INT TERM' EXIT INT TERM
 	fi
 
-	# Write our PID before entering the loop
-	echo $$ >"${pid_file}"
+	# Write PID file for --stop and --status compatibility
+	echo $$ >"${pid_file}" || true
 
-	# Remove PID file on exit (Ctrl+C, SIGTERM, or normal exit)
-	trap 'rm -f "${pid_file}"; trap - EXIT INT TERM' EXIT INT TERM
+	# Remove PID file on exit (flock path — lock_dir cleanup not needed for flock)
+	if command -v flock >/dev/null 2>&1; then
+		trap 'rm -f "${pid_file}"; trap - EXIT INT TERM' EXIT INT TERM
+	fi
 
 	echo "[${SCRIPT_NAME}] Starting daemon mode (PID $$, interval: ${DAEMON_INTERVAL}s, fast: 10s when shellcheck detected)"
 	echo "[${SCRIPT_NAME}] Press Ctrl+C to stop"
@@ -965,7 +995,9 @@ cmd_restart() {
 	return $?
 }
 
-# Install launchd plist for periodic monitoring (every 30 seconds)
+# Install launchd plist for periodic monitoring (every 300 seconds)
+# 300s interval reduces launchd trigger frequency, lowering the probability of
+# concurrent starts that could bypass the daemon lock (GH#17573).
 cmd_install() {
 	# Resolve script path — prefer installed location
 	local script_path
@@ -995,7 +1027,7 @@ cmd_install() {
 		<string>${script_path}</string>
 	</array>
 	<key>StartInterval</key>
-	<integer>30</integer>
+	<integer>300</integer>
 	<key>StandardOutPath</key>
 	<string>${home_escaped}/.aidevops/logs/memory-pressure-launchd.log</string>
 	<key>StandardErrorPath</key>
@@ -1028,7 +1060,7 @@ EOF
 	echo "Installed and loaded: ${LAUNCHD_LABEL}"
 	echo "Plist: ${PLIST_PATH}"
 	echo "Log: ${LOG_FILE}"
-	echo "Check interval: 30 seconds"
+	echo "Check interval: 300 seconds"
 	return 0
 }
 
@@ -1048,9 +1080,11 @@ cmd_uninstall() {
 		cmd_stop 2>/dev/null || true
 	fi
 
-	# Clean up state files
+	# Clean up state files (including lock files from GH#17573 fix)
 	rm -f "${STATE_DIR}"/memory-pressure-*.cooldown
 	rm -f "${pid_file}"
+	rm -f "${STATE_DIR}/memory-pressure-monitor.lock"
+	rm -rf "${STATE_DIR}/memory-pressure-monitor.lockdir"
 	echo "Cleaned up state files"
 	return 0
 }
