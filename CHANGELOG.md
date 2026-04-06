@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.128] - 2026-04-06
+
+### Fixed
+
+- headless contract V5 — warn workers about 300s watchdog, max 240s waits
+
 ## [3.6.127] - 2026-04-06
 
 ### Fixed
