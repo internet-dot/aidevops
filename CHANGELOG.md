@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.119] - 2026-04-06
+
+### Changed
+
+- align stale assignment TTL with dispatch comment TTL (1800s) (#17572)
+- reduce nesting depth in oauth-pool-helper.sh from 109 to 3 (#17570)
+- add code scaffolding requirement to plans.md Save Flow
+- fix profile-readme session hours hardcoded to ~/Git/aidevops (#17568)
+- Refactor: reduce nesting depth in generate-claude-commands.sh (#17569)
+- decompose cmd_fix_shell() into focused helpers (#17555)
+
+### Fixed
+
+- track logind sessions by ID to avoid hostname matching (GH#17551) (#17566)
+
 ## [3.6.118] - 2026-04-06
 
 ### Fixed
