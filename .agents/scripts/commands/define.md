@@ -41,6 +41,7 @@ Ask sequentially. Each question: 2–4 concrete options, one recommended. Adapt 
 - **Q1 Goal** (always first): "In one sentence, what must this task produce?" — offer inferred goal as option 1
 - **Q2 Scope boundary**: "What is explicitly NOT in scope?" — offer inferred exclusion, "nothing", or custom
 - **Q3 Success criteria**: "How will you know this is done?" — automated tests (recommended for feature/bugfix), manual verification, code review, or custom
+- **Q4 Implementation anchor** (t1901 — MANDATORY for code tasks): "Which files will need to change, and is there an existing file to model on?" — search the codebase (`git ls-files`, `rg`) to offer concrete file paths as options. If the user doesn't know, search for them. The brief's How section MUST contain at least one file path — a brief without file paths produces vague issues that waste worker tokens on exploration. This question mentors the implementer by transferring knowledge of where to work.
 
 **Type-specific questions:** Load from `reference/define-probes/${task_type}.md` and ask 1–2 additional questions.
 
