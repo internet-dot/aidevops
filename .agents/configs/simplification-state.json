@@ -1754,9 +1754,9 @@
       "pr": 13021
     },
     ".agents/scripts/headless-runtime-helper.sh": {
-      "hash": "ef7d697745258569f4cab2203b90547db17c868c",
-      "at": "2026-04-07T01:11:06Z",
-      "passes": 21,
+      "hash": "274aa6efd4b42744eedbbc6b7905a6f1cd745ddd",
+      "at": "2026-04-07T01:33:01Z",
+      "passes": 22,
       "pr": 15086
     },
     ".agents/scripts/issue-sync-lib.sh": {
@@ -1790,9 +1790,9 @@
       "pr": 15455
     },
     ".agents/scripts/pulse-wrapper.sh": {
-      "hash": "40dd6ca2a904b15d7984686deace278da7f72f77",
-      "at": "2026-04-07T01:11:06Z",
-      "passes": 37,
+      "hash": "da118dc60fa2139950c30410a2bb432c08035d65",
+      "at": "2026-04-07T01:33:01Z",
+      "passes": 38,
       "pr": 15086
     },
     ".agents/scripts/schema-validator-helper.sh": {
@@ -3237,9 +3237,9 @@
       "pr": 15534
     },
     ".agents/tools/ai-assistants/headless-dispatch.md": {
-      "hash": "1acae7831ec13a49cba054a9e74c96745a332186",
-      "at": "2026-03-29T03:15:46Z",
-      "passes": 1,
+      "hash": "cabd19d2410df661bc4dc7cd0857d952bc3043f9",
+      "at": "2026-04-07T01:33:18Z",
+      "passes": 2,
       "pr": 12352
     },
     ".agents/tools/ai-assistants/models-README.md": {
@@ -5267,15 +5267,15 @@
       "pr": 15490
     },
     "aidevops.sh": {
-      "hash": "8baa3a74bedc31a6fc91e3884b5849fbb14d0b24",
-      "at": "2026-04-07T01:11:31Z",
-      "passes": 56,
+      "hash": "3c7c928b9f735666668fd782efecb76c52a4e84f",
+      "at": "2026-04-07T01:33:33Z",
+      "passes": 57,
       "pr": 15470
     },
     "setup.sh": {
-      "hash": "ab324037197510f31067fcaa18a4626d17eb0198",
-      "at": "2026-04-07T01:11:31Z",
-      "passes": 55,
+      "hash": "c5f2ee942ebb1555f4c291d05373370ddd71b4c5",
+      "at": "2026-04-07T01:33:33Z",
+      "passes": 56,
       "pr": 15470
     },
     "todo/tasks/GH#15363-brief.md": {
@@ -6695,10 +6695,10 @@
       "passes": 2
     },
     ".agents/scripts/worker-lifecycle-common.sh": {
-      "hash": "24b05c765f37b7806560039b7ff32ec6c82e83d4",
-      "at": "2026-04-07T01:11:07Z",
+      "hash": "e084c0148761b8d677c87dfa64f2fd1dd126f5be",
+      "at": "2026-04-07T01:33:02Z",
       "pr": 17353,
-      "passes": 5
+      "passes": 6
     },
     ".agents/tools/code-review/setup.md": {
       "hash": "fb0d5288be7a808f9dc232d229f4dca354745323",
@@ -6807,6 +6807,12 @@
       "hash": "e856d04a2fead9fcf07c4e5ca80ab1ce792e6348",
       "at": "2026-04-07T01:11:32Z",
       "pr": 17646,
+      "passes": 1
+    },
+    ".agents/workflows/brief.md": {
+      "hash": "43b48d6c285bd49f3ce0269a36aabe590849dc07",
+      "at": "2026-04-07T01:33:35Z",
+      "pr": 17647,
       "passes": 1
     }
   },
