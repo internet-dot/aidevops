@@ -1859,33 +1859,16 @@ _execute_run_attempt() {
 	# GH#17549: Claim guard — verify a DISPATCH_CLAIM exists for this runner
 	# before launching a worker for an issue. This prevents pulse LLMs from
 	# bypassing dispatch_with_dedup() by calling headless-runtime-helper directly.
-	# Only enforced for issue workers (session_key=issue-*), not pulse/triage.
+	# GH#17549: Export repo slug for _release_dispatch_claim on failure.
+	# The claim guard was removed — it checked for DISPATCH_CLAIM nonce= comments
+	# but dispatch_with_dedup posts "Dispatching worker" comments instead (GH#15317).
+	# The mismatch caused the guard to reject every legitimate dispatch, creating
+	# a claim→reject→release→reclaim loop. dispatch_with_dedup is the authoritative
+	# dedup layer; a second check here adds no safety and causes false rejections.
 	if [[ "$role" == "worker" && "$session_key" == issue-* ]]; then
-		local _claim_issue_number="${session_key#issue-}"
 		local _claim_repo_slug=""
-		# Extract repo slug from work_dir path (~/Git/<repo>/ pattern)
 		_claim_repo_slug=$(git -C "$work_dir" remote get-url origin 2>/dev/null | sed -E 's|.*github\.com[:/]||; s|\.git$||' || true)
-		# Export repo slug so _release_dispatch_claim can use it on failure
 		export DISPATCH_REPO_SLUG="${_claim_repo_slug}"
-		if [[ -n "$_claim_repo_slug" && -n "$_claim_issue_number" ]]; then
-			local _claim_helper="${SCRIPT_DIR}/dispatch-claim-helper.sh"
-			if [[ -x "$_claim_helper" ]]; then
-				if "$_claim_helper" check "$_claim_issue_number" "$_claim_repo_slug" >/dev/null 2>&1; then
-					# exit 0 = active claim exists — proceed
-					: # claim exists, safe to continue
-				else
-					local _claim_check_exit=$?
-					if [[ "$_claim_check_exit" -eq 1 ]]; then
-						# exit 1 = NO active claim — block the launch
-						print_warning "Claim guard: no active DISPATCH_CLAIM for issue #${_claim_issue_number} on ${_claim_repo_slug} — refusing to launch worker (GH#17549). Use dispatch_with_dedup() to dispatch workers."
-						_run_failure_reason="no_dispatch_claim"
-						return 1
-					fi
-					# exit 2 = error — fail open (proceed)
-					print_warning "Claim guard: dispatch-claim-helper check returned error (exit ${_claim_check_exit}) — proceeding (fail-open)"
-				fi
-			fi
-		fi
 	fi
 
 	local output_file exit_code_file exit_code
