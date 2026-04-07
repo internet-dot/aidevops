@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.138] - 2026-04-07
+
+### Changed
+
+- fix ESCAPE clause — 4 backslashes produced 2-char string, SQLite requires 1 (#17638)
+
+### Fixed
+
+- remove claim guard — mismatched comment format rejected every dispatch
+
 ## [3.6.136] - 2026-04-07
 
 ### Changed
