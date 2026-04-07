@@ -4325,11 +4325,45 @@ issue_has_required_approval() {
 # issue <number>`. This ensures only a human with the system password
 # (and root access to the approval signing key) can approve issues.
 #
-# Fallback: maintainer-authored issues are still auto-approved (the
-# maintainer wouldn't gate their own issues). Comment-based approval
-# is removed — workers share the same GitHub account so any comment
-# from the account is indistinguishable from a human comment.
+# Fallback: maintainer-authored issues are auto-approved unless the
+# maintainer themselves applied NMR as a manual hold (GH#17642).
+# Comment-based approval is removed — workers share the same GitHub
+# account so any comment from the account is indistinguishable from
+# a human comment.
 #######################################
+#######################################
+# Check if the most recent NMR label on an issue was applied by the
+# maintainer themselves (GH#17642). Uses the immutable timeline API to
+# find the actor of the most recent "labeled" event for NMR.
+#
+# Arguments:
+#   $1 - issue number
+#   $2 - repo slug (owner/repo)
+#   $3 - maintainer login
+# Returns: 0 if the maintainer manually applied NMR, 1 otherwise
+#######################################
+_nmr_applied_by_maintainer() {
+	local issue_num="$1"
+	local slug="$2"
+	local maintainer="$3"
+
+	[[ -n "$issue_num" && -n "$slug" && -n "$maintainer" ]] || return 1
+
+	# Query the timeline for all NMR label events and get the actor of the
+	# most recent one. The timeline is immutable and append-only, so the
+	# last "labeled" event for NMR reflects who most recently applied it.
+	local nmr_actor
+	nmr_actor=$(gh api "repos/${slug}/issues/${issue_num}/timeline" --paginate \
+		--jq '[.[] | select(.event == "labeled" and .label.name == "needs-maintainer-review")] | last | .actor.login // empty' \
+		2>/dev/null) || nmr_actor=""
+
+	if [[ "$nmr_actor" == "$maintainer" ]]; then
+		return 0
+	fi
+
+	return 1
+}
+
 auto_approve_maintainer_issues() {
 	local repos_json="$REPOS_JSON"
 	[[ -f "$repos_json" ]] || return 0
@@ -4361,10 +4395,17 @@ auto_approve_maintainer_issues() {
 			local should_approve=false
 			local approval_reason=""
 
-			# Case 1: maintainer created the issue — auto-approve
+			# Case 1: maintainer created the issue — auto-approve UNLESS
+			# the maintainer themselves applied NMR (manual hold, GH#17642).
+			# Only auto-approve NMR labels applied by automation (triage gate,
+			# relabel_needs_info_replies, etc.).
 			if [[ "$issue_author" == "$maintainer" ]]; then
-				should_approve=true
-				approval_reason="maintainer is author"
+				if _nmr_applied_by_maintainer "$issue_num" "$slug" "$maintainer"; then
+					echo "[pulse-wrapper] Skipping auto-approve for #${issue_num} in ${slug} — NMR manually applied by maintainer (GH#17642)" >>"$LOGFILE"
+				else
+					should_approve=true
+					approval_reason="maintainer is author, NMR applied by automation"
+				fi
 			fi
 
 			# Case 2: cryptographic approval signature found
