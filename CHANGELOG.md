@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.139] - 2026-04-07
+
+### Added
+
+- cascade tier dispatch with tier:simple/standard/reasoning (#17645)
+- restore daily full codebase review via CodeRabbit (GH#17640) (#17641)
+
 ## [3.6.138] - 2026-04-07
 
 ### Changed
